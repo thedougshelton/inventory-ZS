@@ -998,4 +998,710 @@
     const addBtn = document.getElementById("addBtn");
     const exportXlsxBtn = document.getElementById("exportXlsxBtn");
     const finalExportBtn = document.getElementById("finalExportBtn");
+    const undoBtn = document.getElementById("undoBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const backupJsonBtn = document.getElementById("backupJsonBtn");
+    const focusEntryBtn = document.getElementById("focusEntryBtn");
+    const exportCsvBtn = document.getElementById("exportCsvBtn");
+    const toggleImportBtn = document.getElementById("toggleImportBtn");
+    const importBackupBtn = document.getElementById("importBackupBtn");
+    const clearFileBtn = document.getElementById("clearFileBtn");
+    const backupFileInput = document.getElementById("backupFileInput");
 
+    const exportDeletedCsvBtn = document.getElementById("exportDeletedCsvBtn");
+    const copyDeletedBtn = document.getElementById("copyDeletedBtn");
+
+    const editPanel = document.getElementById("editPanel");
+    const editTitle = document.getElementById("editTitle");
+    const editCode = document.getElementById("editCode");
+    const editCustomerName = document.getElementById("editCustomerName");
+    const editCondition = document.getElementById("editCondition");
+    const editStatus = document.getElementById("editStatus");
+    const editInitials = document.getElementById("editInitials");
+    const editNotes = document.getElementById("editNotes");
+    const saveEditBtn = document.getElementById("saveEditBtn");
+    const cancelEditBtn = document.getElementById("cancelEditBtn");
+
+    const searchInput = document.getElementById("searchInput");
+    const listEl = document.getElementById("list");
+    const deletedListEl = document.getElementById("deletedList");
+
+    const countEl = document.getElementById("count");
+    const deletedMetricEl = document.getElementById("deletedMetric");
+    const lastEntryMetricEl = document.getElementById("lastEntryMetric");
+    const lastSavedEl = document.getElementById("lastSaved");
+
+    const statusEl = document.getElementById("status");
+    const lockBadge = document.getElementById("lockBadge");
+    const xlsxBadge = document.getElementById("xlsxBadge");
+
+    const conditionSummary = document.getElementById("conditionSummary");
+    const statusSummary = document.getElementById("statusSummary");
+    const initialsSummary = document.getElementById("initialsSummary");
+
+    const finalReportEl = document.getElementById("finalReport");
+    const copyReportBtn = document.getElementById("copyReportBtn");
+    const downloadReportBtn = document.getElementById("downloadReportBtn");
+
+    const finishConfirm = document.getElementById("finishConfirm");
+    const finishClearBtn = document.getElementById("finishClearBtn");
+
+    const sessionNameKey = SESSION_KEY;
+
+    let entries = [];
+    let deleted = [];
+    let dupes = [];
+    let nextSequence = 1;
+    let editId = null;
+    let editIsDeleted = false;
+    let xlsxLoaded = false;
+
+    function loadLocal() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) entries = JSON.parse(raw) || [];
+      } catch (e) { entries = []; }
+
+      try {
+        const rawDeleted = localStorage.getItem(DELETED_KEY);
+        if (rawDeleted) deleted = JSON.parse(rawDeleted) || [];
+      } catch (e) { deleted = []; }
+
+      try {
+        const rawNext = localStorage.getItem(NEXT_SEQUENCE_KEY);
+        if (rawNext) nextSequence = parseInt(rawNext, 10) || nextSequence;
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawDupes = localStorage.getItem(DUPE_KEY);
+        if (rawDupes) dupes = JSON.parse(rawDupes) || [];
+      } catch (e) { dupes = []; }
+
+      try {
+        const rawSession = localStorage.getItem(SESSION_KEY);
+        if (rawSession) sessionNameInput.value = rawSession;
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawInitials = localStorage.getItem(INITIALS_KEY);
+        if (rawInitials) employeeInitialsInput.value = rawInitials;
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawLastSaved = localStorage.getItem(LAST_SAVED_KEY);
+        if (rawLastSaved) lastSavedEl.textContent = rawLastSaved;
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawLocked = localStorage.getItem(EDIT_LOCKED_KEY);
+        if (rawLocked === "true") setLocked(true);
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawEntryMode = localStorage.getItem(ENTRY_MODE_KEY);
+        if (rawEntryMode === "true") document.body.classList.add('entry-mode');
+      } catch (e) { /* ignore */ }
+    }
+
+    function saveLocal() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      localStorage.setItem(DELETED_KEY, JSON.stringify(deleted));
+      localStorage.setItem(DUPE_KEY, JSON.stringify(dupes));
+      localStorage.setItem(NEXT_SEQUENCE_KEY, String(nextSequence));
+      localStorage.setItem(SESSION_KEY, sessionNameInput.value || '');
+      localStorage.setItem(INITIALS_KEY, employeeInitialsInput.value || '');
+      localStorage.setItem(LAST_SAVED_KEY, new Date().toLocaleString());
+      lastSavedEl.textContent = new Date().toLocaleString();
+    }
+
+    function setLocked(locked) {
+      if (locked) {
+        lockBadge.textContent = 'Editing Locked';
+        lockBadge.classList.remove('unlocked');
+        lockBadge.classList.add('locked');
+        localStorage.setItem(EDIT_LOCKED_KEY, 'true');
+      } else {
+        lockBadge.textContent = 'Editing Unlocked';
+        lockBadge.classList.remove('locked');
+        lockBadge.classList.add('unlocked');
+        localStorage.setItem(EDIT_LOCKED_KEY, 'false');
+      }
+    }
+
+    function formatEntry(e) {
+      return `${String(e.seq).padStart(3, '0')} ${e.code} ${e.customer ? '— ' + e.customer : ''}`;
+    }
+
+    function renderList() {
+      listEl.innerHTML = '';
+      const query = searchInput.value.trim().toLowerCase();
+      const filtered = entries.filter(e => {
+        if (!query) return true;
+        return (
+          e.code.toLowerCase().includes(query) ||
+          String(e.seq).includes(query) ||
+          (e.customer && e.customer.toLowerCase().includes(query)) ||
+          (e.notes && e.notes.toLowerCase().includes(query)) ||
+          (e.initials && e.initials.toLowerCase().includes(query)) ||
+          (e.condition && e.condition.toLowerCase().includes(query)) ||
+          (e.status && e.status.toLowerCase().includes(query))
+        );
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="empty">No active entries</div>';
+      }
+
+      filtered.forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const left = document.createElement('div');
+        left.innerHTML = `<div class="num">${String(e.seq).padStart(3, '0')}</div>`;
+
+        const center = document.createElement('div');
+        center.style.minWidth = '0';
+        const code = document.createElement('div');
+        code.className = 'code';
+        code.textContent = e.code;
+        center.appendChild(code);
+
+        const details = document.createElement('div');
+        details.className = 'details';
+        if (e.customer) {
+          const t = document.createElement('div');
+          t.className = 'tag';
+          t.textContent = e.customer;
+          details.appendChild(t);
+        }
+        if (e.condition) {
+          const t = document.createElement('div');
+          t.className = 'tag';
+          t.textContent = e.condition;
+          details.appendChild(t);
+        }
+        if (e.status) {
+          const t = document.createElement('div');
+          t.className = 'tag';
+          t.textContent = e.status;
+          details.appendChild(t);
+        }
+        if (e.initials) {
+          const t = document.createElement('div');
+          t.className = 'tag';
+          t.textContent = e.initials;
+          details.appendChild(t);
+        }
+        if (e.notes) {
+          const np = document.createElement('div');
+          np.className = 'note-preview';
+          np.textContent = e.notes;
+          center.appendChild(np);
+        }
+        center.appendChild(details);
+
+        const actions = document.createElement('div');
+        actions.className = 'row-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => openEdit(e.id, false));
+        actions.appendChild(editBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => deleteEntry(e.id));
+        actions.appendChild(delBtn);
+
+        row.appendChild(left);
+        row.appendChild(center);
+        row.appendChild(actions);
+
+        listEl.appendChild(row);
+      });
+
+      countEl.textContent = entries.length;
+      deletedMetricEl.textContent = deleted.length;
+      lastEntryMetricEl.textContent = entries.length ? entries[entries.length - 1].code : '—';
+
+      renderSummary();
+    }
+
+    function renderDeleted() {
+      deletedListEl.innerHTML = '';
+      if (deleted.length === 0) {
+        deletedListEl.innerHTML = '<div class="empty">No deleted entries</div>';
+      }
+      deleted.forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const left = document.createElement('div');
+        left.innerHTML = `<div class="num">${String(e.seq).padStart(3, '0')}</div>`;
+
+        const center = document.createElement('div');
+        center.style.minWidth = '0';
+        const code = document.createElement('div');
+        code.className = 'code';
+        code.textContent = e.code;
+        center.appendChild(code);
+
+        const details = document.createElement('div');
+        details.className = 'details';
+        if (e.customer) {
+          const t = document.createElement('div');
+          t.className = 'tag';
+          t.textContent = e.customer;
+          details.appendChild(t);
+        }
+        if (e.condition) {
+          const t = document.createElement('div');
+          t.className = 'tag';
+          t.textContent = e.condition;
+          details.appendChild(t);
+        }
+        if (e.status) {
+          const t = document.createElement('div');
+          t.className = 'tag';
+          t.textContent = e.status;
+          details.appendChild(t);
+        }
+        if (e.initials) {
+          const t = document.createElement('div');
+          t.className = 'tag';
+          t.textContent = e.initials;
+          details.appendChild(t);
+        }
+        if (e.notes) {
+          const np = document.createElement('div');
+          np.className = 'note-preview';
+          np.textContent = e.notes;
+          center.appendChild(np);
+        }
+        center.appendChild(details);
+
+        const actions = document.createElement('div');
+        actions.className = 'row-actions';
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.textContent = 'Restore';
+        restoreBtn.addEventListener('click', () => restoreDeleted(e.id));
+        actions.appendChild(restoreBtn);
+
+        row.appendChild(left);
+        row.appendChild(center);
+        row.appendChild(actions);
+
+        deletedListEl.appendChild(row);
+      });
+
+      deletedMetricEl.textContent = deleted.length;
+    }
+
+    function renderSummary() {
+      const byCondition = {};
+      const byStatus = {};
+      const byInitials = {};
+
+      entries.forEach(e => {
+        byCondition[e.condition || 'Unknown'] = (byCondition[e.condition || 'Unknown'] || 0) + 1;
+        byStatus[e.status || 'Unknown'] = (byStatus[e.status || 'Unknown'] || 0) + 1;
+        byInitials[e.initials || 'Unknown'] = (byInitials[e.initials || 'Unknown'] || 0) + 1;
+      });
+
+      conditionSummary.innerHTML = Object.keys(byCondition).map(k => `<div class="summary-line"><div>${k}</div><div>${byCondition[k]}</div></div>`).join('');
+      statusSummary.innerHTML = Object.keys(byStatus).map(k => `<div class="summary-line"><div>${k}</div><div>${byStatus[k]}</div></div>`).join('');
+      initialsSummary.innerHTML = Object.keys(byInitials).map(k => `<div class="summary-line"><div>${k}</div><div>${byInitials[k]}</div></div>`).join('');
+    }
+
+    function addEntry(code, opts = {}) {
+      const entry = {
+        id: 'e' + Date.now() + Math.random().toString(36).slice(2, 8),
+        seq: nextSequence++,
+        code: code.toUpperCase(),
+        customer: opts.customer || '',
+        condition: opts.condition || 'Good',
+        status: opts.status || 'Built',
+        initials: opts.initials || (employeeInitialsInput.value || ''),
+        notes: opts.notes || '',
+        createdAt: new Date().toISOString()
+      };
+
+      entries.push(entry);
+      saveLocal();
+      renderList();
+    }
+
+    function deleteEntry(id) {
+      const idx = entries.findIndex(e => e.id === id);
+      if (idx === -1) return;
+      const [removed] = entries.splice(idx, 1);
+      deleted.push(removed);
+      saveLocal();
+      renderList();
+      renderDeleted();
+    }
+
+    function restoreDeleted(id) {
+      const idx = deleted.findIndex(e => e.id === id);
+      if (idx === -1) return;
+      const [restored] = deleted.splice(idx, 1);
+      entries.push(restored);
+      saveLocal();
+      renderList();
+      renderDeleted();
+    }
+
+    function openEdit(id, isDeleted) {
+      editId = id;
+      editIsDeleted = isDeleted;
+      const targetList = isDeleted ? deleted : entries;
+      const item = targetList.find(e => e.id === id);
+      if (!item) return;
+      editCode.value = item.code;
+      editCustomerName.value = item.customer || '';
+      editCondition.value = item.condition || 'Good';
+      editStatus.value = item.status || 'Built';
+      editInitials.value = item.initials || '';
+      editNotes.value = item.notes || '';
+      editTitle.textContent = isDeleted ? `Edit Deleted Entry #${String(item.seq).padStart(3, '0')}` : `Edit Entry #${String(item.seq).padStart(3, '0')}`;
+      editPanel.classList.add('open');
+      editCode.focus();
+    }
+
+    function closeEdit() {
+      editPanel.classList.remove('open');
+      editId = null;
+      editIsDeleted = false;
+    }
+
+    function saveEdit() {
+      const targetList = editIsDeleted ? deleted : entries;
+      const item = targetList.find(e => e.id === editId);
+      if (!item) return;
+      item.code = editCode.value.toUpperCase();
+      item.customer = editCustomerName.value || '';
+      item.condition = editCondition.value || 'Good';
+      item.status = editStatus.value || 'Built';
+      item.initials = editInitials.value || '';
+      item.notes = editNotes.value || '';
+      saveLocal();
+      renderList();
+      renderDeleted();
+      closeEdit();
+    }
+
+    saveEditBtn.addEventListener('click', saveEdit);
+    cancelEditBtn.addEventListener('click', closeEdit);
+
+    addBtn.addEventListener('click', () => {
+      const code = input.value.trim();
+      if (!/^[A-Za-z0-9]{6}$/.test(code)) {
+        statusEl.textContent = 'Invalid code format — must be 6 letters/numbers.';
+        statusEl.className = 'status error';
+        return;
+      }
+      addEntry(code, {
+        customer: customerNameInput.value.trim(),
+        condition: document.querySelector('input[name="containerCondition"]:checked').value,
+        status: document.querySelector('input[name="containerStatus"]:checked').value,
+        initials: employeeInitialsInput.value.trim(),
+        notes: notesInput.value.trim()
+      });
+      input.value = '';
+      statusEl.textContent = 'Entry added.';
+      statusEl.className = 'status success';
+      input.focus();
+    });
+
+    // quick keyboard enter support
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addBtn.click();
+    });
+
+    undoBtn.addEventListener('click', () => {
+      if (entries.length === 0) return;
+      const removed = entries.pop();
+      dupes.push(removed.code);
+      saveLocal();
+      renderList();
+      statusEl.textContent = 'Last entry undone.';
+      statusEl.className = 'status info';
+    });
+
+    copyBtn.addEventListener('click', () => {
+      const lines = entries.map(e => formatEntry(e)).join('\n');
+      navigator.clipboard.writeText(lines).then(() => {
+        statusEl.textContent = 'Active list copied to clipboard.';
+        statusEl.className = 'status success';
+      }).catch(() => {
+        statusEl.textContent = 'Copy failed — clipboard permissions?';
+        statusEl.className = 'status error';
+      });
+    });
+
+    backupJsonBtn.addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify({entries, deleted, dupes, nextSequence})], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zippy-shell-backup-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      statusEl.textContent = 'Backup JSON exported.';
+      statusEl.className = 'status success';
+    });
+
+    focusEntryBtn.addEventListener('click', () => input.focus());
+
+    exportCsvBtn.addEventListener('click', () => {
+      const rows = entries.map(e => [e.seq, e.code, e.customer, e.condition, e.status, e.initials, e.notes].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
+      const csv = 'Seq,Code,Customer,Condition,Status,Initials,Notes\n' + rows.join('\n');
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zippy-shell-export-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      statusEl.textContent = 'CSV exported.';
+      statusEl.className = 'status success';
+    });
+
+    toggleImportBtn.addEventListener('click', () => {
+      importPanel.hidden = !importPanel.hidden;
+    });
+
+    clearFileBtn.addEventListener('click', () => { backupFileInput.value = ''; });
+
+    importBackupBtn.addEventListener('click', () => {
+      const f = backupFileInput.files[0];
+      if (!f) {
+        statusEl.textContent = 'No file selected.';
+        statusEl.className = 'status warning';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = ev.target.result;
+          let parsed;
+          if (f.name.endsWith('.json')) {
+            parsed = JSON.parse(data);
+          } else if (f.name.endsWith('.csv')) {
+            // simple CSV parse
+            const lines = data.split(/\r?\n/).filter(Boolean);
+            const rows = lines.slice(1).map(line => line.split(','));
+            parsed = {entries: rows.map((r, i) => ({id: 'i'+i, seq: parseInt(r[0],10)||i+1, code: (r[1]||'').replace(/"/g,''), customer: r[2]||'', condition: r[3]||'Good', status: r[4]||'Built', initials: r[5]||'', notes: r[6]||''}))};
+          } else if (f.name.endsWith('.xlsx')) {
+            const wb = XLSX.read(data, {type: 'binary'});
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(sheet, {header:1});
+            const rows = json.slice(1);
+            parsed = {entries: rows.map((r, i) => ({id:'x'+i, seq: parseInt(r[0],10)||i+1, code: (r[1]||''), customer: r[2]||'', condition: r[3]||'Good', status: r[4]||'Built', initials: r[5]||'', notes: r[6]||''}))};
+          }
+
+          if (parsed && parsed.entries) {
+            if (!confirm('Import will replace current active and deleted lists. Continue?')) return;
+            entries = parsed.entries;
+            deleted = parsed.deleted || [];
+            dupes = parsed.dupes || [];
+            nextSequence = parsed.nextSequence || (entries.length ? Math.max(...entries.map(e=>e.seq))+1 : 1);
+            saveLocal();
+            renderList();
+            renderDeleted();
+            statusEl.textContent = 'Import successful.';
+            statusEl.className = 'status success';
+          } else {
+            statusEl.textContent = 'Unable to parse file.';
+            statusEl.className = 'status error';
+          }
+
+        } catch (e) {
+          statusEl.textContent = 'Import failed: ' + e.message;
+          statusEl.className = 'status error';
+        }
+      };
+
+      if (f.name.endsWith('.xlsx')) reader.readAsBinaryString(f);
+      else reader.readAsText(f);
+    });
+
+    exportDeletedCsvBtn.addEventListener('click', () => {
+      const rows = deleted.map(e => [e.seq, e.code, e.customer, e.condition, e.status, e.initials, e.notes].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
+      const csv = 'Seq,Code,Customer,Condition,Status,Initials,Notes\n' + rows.join('\n');
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zippy-shell-deleted-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      statusEl.textContent = 'Deleted CSV exported.';
+      statusEl.className = 'status success';
+    });
+
+    copyDeletedBtn.addEventListener('click', () => {
+      const lines = deleted.map(e => formatEntry(e)).join('\n');
+      navigator.clipboard.writeText(lines).then(() => {
+        statusEl.textContent = 'Deleted list copied to clipboard.';
+        statusEl.className = 'status success';
+      }).catch(() => {
+        statusEl.textContent = 'Copy failed — clipboard permissions?';
+        statusEl.className = 'status error';
+      });
+    });
+
+    function generateReport() {
+      const lines = [];
+      lines.push('Zippy Shell — Final Inventory Report');
+      lines.push('Date: ' + new Date().toLocaleString());
+      lines.push('Session: ' + (sessionNameInput.value || ''));
+      lines.push('Initials: ' + (employeeInitialsInput.value || ''));
+      lines.push('');
+      lines.push('Active Entries: ' + entries.length);
+      lines.push('Deleted Entries: ' + deleted.length);
+      lines.push('');
+      lines.push('By Condition:');
+      const cond = {};
+      entries.forEach(e => cond[e.condition || 'Unknown'] = (cond[e.condition || 'Unknown'] || 0) + 1);
+      Object.keys(cond).forEach(k => lines.push(` - ${k}: ${cond[k]}`));
+      lines.push('');
+      lines.push('By Status:');
+      const st = {};
+      entries.forEach(e => st[e.status || 'Unknown'] = (st[e.status || 'Unknown'] || 0) + 1);
+      Object.keys(st).forEach(k => lines.push(` - ${k}: ${st[k]}`));
+      lines.push('');
+      lines.push('Entries:');
+      entries.forEach(e => lines.push(formatEntry(e)));
+      return lines.join('\n');
+    }
+
+    copyReportBtn.addEventListener('click', () => {
+      const report = generateReport();
+      navigator.clipboard.writeText(report).then(() => {
+        statusEl.textContent = 'Report copied to clipboard.';
+        statusEl.className = 'status success';
+      }).catch(() => {
+        statusEl.textContent = 'Copy failed.';
+        statusEl.className = 'status error';
+      });
+    });
+
+    downloadReportBtn.addEventListener('click', () => {
+      const report = generateReport();
+      const blob = new Blob([report], {type: 'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zippy-shell-report-${new Date().toISOString().slice(0,10)}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      statusEl.textContent = 'Report downloaded.';
+      statusEl.className = 'status success';
+    });
+
+    finalExportBtn.addEventListener('click', () => {
+      // make a final export (XLSX) and set a signature to lock editing
+      const wb = XLSX.utils.book_new();
+      const wsData = [["Seq","Code","Customer","Condition","Status","Initials","Notes"]];
+      entries.forEach(e => wsData.push([e.seq, e.code, e.customer, e.condition, e.status, e.initials, e.notes]));
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+      const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      const blob = new Blob([wbout], {type: 'application/octet-stream'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zippy-shell-final-${new Date().toISOString().slice(0,10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      // lock editing
+      localStorage.setItem(FINAL_EXPORT_SIGNATURE_KEY, String(Date.now()));
+      setLocked(true);
+      statusEl.textContent = 'Final export complete. Editing locked.';
+      statusEl.className = 'status success';
+    });
+
+    unlockBtn.addEventListener('click', () => {
+      localStorage.removeItem(FINAL_EXPORT_SIGNATURE_KEY);
+      setLocked(false);
+      statusEl.textContent = 'Editing unlocked.';
+      statusEl.className = 'status info';
+    });
+
+    exportXlsxBtn.addEventListener('click', () => {
+      const wb = XLSX.utils.book_new();
+      const wsData = [["Seq","Code","Customer","Condition","Status","Initials","Notes"]];
+      entries.forEach(e => wsData.push([e.seq, e.code, e.customer, e.condition, e.status, e.initials, e.notes]));
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+      const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      const blob = new Blob([wbout], {type: 'application/octet-stream'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zippy-shell-${new Date().toISOString().slice(0,10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      statusEl.textContent = 'XLSX exported.';
+      statusEl.className = 'status success';
+    });
+
+    searchInput.addEventListener('input', () => renderList());
+
+    finishClearBtn.addEventListener('click', () => {
+      if (finishConfirm.value !== 'FINISHED') {
+        statusEl.textContent = 'Type FINISHED to confirm.';
+        statusEl.className = 'status warning';
+        return;
+      }
+      entries = [];
+      deleted = [];
+      dupes = [];
+      nextSequence = 1;
+      saveLocal();
+      renderList();
+      renderDeleted();
+      statusEl.textContent = 'Finished list cleared.';
+      statusEl.className = 'status success';
+      finishConfirm.value = '';
+    });
+
+    // load xlsx library readiness
+    function checkXLSX() {
+      if (window.XLSX) {
+        xlsxLoaded = true;
+        xlsxBadge.textContent = 'XLSX ready';
+        xlsxBadge.classList.add('unlocked');
+      } else {
+        xlsxBadge.textContent = 'XLSX not available';
+        xlsxBadge.classList.add('locked');
+      }
+    }
+
+    // init
+    loadLocal();
+    renderList();
+    renderDeleted();
+    checkXLSX();
+
+    // Expose for debug
+    window._zippy = { entries, deleted, renderList, saveLocal };
+  </script>
+</body>
+</html>
