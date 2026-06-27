@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Zippy Shell Inventory App" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Zippy Shell Inventory App</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #dbe3ef;
+      --accent: #0f172a;
+      --accentText: #ffffff;
+      --danger: #b91c1c;
+      --success: #166534;
+      --warning: #92400e;
+      --info: #1e40af;
+      --soft: #eef2f7;
+      --greenSoft: #ecfdf5;
+      --redSoft: #fef2f2;
+      --yellowSoft: #fffbeb;
+      --blueSoft: #eff6ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 18px;
+      padding-bottom: 44px;
+    }
+
+    header { margin-bottom: 14px; }
+
+    h1 {
+      font-size: 28px;
+      line-height: 1.1;
+      margin: 0 0 6px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 19px;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 17px;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    .top-status {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 12px 0 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      color: var(--muted);
+      background: #fff;
+      line-height: 1;
+    }
+
+    .badge.locked {
+      color: var(--danger);
+      background: var(--redSoft);
+      border-color: #fecaca;
+      font-weight: 700;
+    }
+
+    .badge.unlocked {
+      color: var(--success);
+      background: var(--greenSoft);
+      border-color: #bbf7d0;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .metric {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      min-height: 78px;
+    }
+
+    .metric .label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .metric .value {
+      font-size: 23px;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      overflow-wrap: anywhere;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      margin: 14px 0;
+    }
+
+    label,
+    .field-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 650;
+      margin-bottom: 8px;
+    }
+
+    .field-group { margin-bottom: 16px; }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="file"],
+    textarea,
+    select {
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      color: var(--text);
+      font-size: 18px;
+      padding: 12px 14px;
+    }
+
+    textarea {
+      min-height: 88px;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    select { font-weight: 650; }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.10);
+      outline: none;
+    }
+
+    .session-row,
+    .two-col,
+    .three-col {
+      display: grid;
+      gap: 10px;
+    }
+
+    .session-row {
+      grid-template-columns: 1fr auto;
+      align-items: end;
+    }
+
+    .two-col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .three-col {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .option-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .option-pill {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 54px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .option-pill input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .option-pill:has(input:checked) {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accentText);
+    }
+
+    .entry-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    #containerInput {
+      font-size: 30px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      min-height: 64px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-weight: 650;
+      cursor: pointer;
+      min-height: 48px;
+    }
+
+    button:active { transform: translateY(1px); }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accentText);
+      min-width: 94px;
+    }
+
+    .danger { color: var(--danger); }
+
+    .danger-solid {
+      color: white;
+      background: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .success-solid {
+      color: white;
+      background: var(--success);
+      border-color: var(--success);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .actions.two { grid-template-columns: repeat(2, 1fr); }
+    .actions.three { grid-template-columns: repeat(3, 1fr); }
+
+    .status {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.35;
+      min-height: 42px;
+    }
+
+    .status.success { color: var(--success); background: var(--greenSoft); }
+    .status.error { color: var(--danger); background: var(--redSoft); }
+    .status.warning { color: var(--warning); background: var(--yellowSoft); }
+    .status.info { color: var(--info); background: var(--blueSoft); }
+
+    .list-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .inventory-list {
+      display: grid;
+      gap: 8px;
+      max-height: 460px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 64px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .num {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 14px;
+    }
+
+    .code {
+      font-size: 20px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+    }
+
+    .details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 13px;
+      color: var(--muted);
+      background: #f8fafc;
+      line-height: 1;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+
+    .note-preview {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: end;
+    }
+
+    .row button,
+    .row-actions button {
+      min-height: 38px;
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 26px 10px;
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      background: #fff;
+    }
+
+    .help {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-top: 10px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .summary-box {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .summary-box h3 { margin-bottom: 8px; }
+
+    .summary-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+      font-size: 15px;
+    }
+
+    .summary-line:first-of-type { border-top: 0; }
+
+    .edit-panel {
+      display: none;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #f8fafc;
+      padding: 12px;
+      margin-top: 12px;
+    }
+
+    .edit-panel.open { display: block; }
+
+    .edit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .edit-grid .full { grid-column: 1 / -1; }
+
+    .report-box {
+      white-space: pre-wrap;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: #fff;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.45;
+      max-height: 360px;
+      overflow: auto;
+    }
+
+    .compact-import-panel {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      border-radius: 16px;
+      padding: 12px;
+    }
+
+    .compact-import-panel[hidden] {
+      display: none;
+    }
+
+    .compact-import-panel .list-head {
+      margin-bottom: 10px;
+    }
+
+    .collapsible-section summary.section-toggle {
+      list-style: none;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-weight: 750;
+      color: var(--text);
+      user-select: none;
+    }
+
+    .collapsible-section summary.section-toggle::-webkit-details-marker {
+      display: none;
+    }
+
+    .collapsible-section summary.section-toggle::after {
+      content: "Open";
+      float: right;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+      margin-top: 2px;
+    }
+
+    .collapsible-section[open] summary.section-toggle::after {
+      content: "Close";
+    }
+
+    .section-body {
+      margin-top: 12px;
+    }
+
+    details.finish-clear summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .confirm-panel {
+      margin-top: 12px;
+      border: 1px solid #fecaca;
+      background: #fef2f2;
+      border-radius: 16px;
+      padding: 12px;
+    }
+
+    .confirm-panel p {
+      margin: 0 0 10px;
+      color: var(--danger);
+      line-height: 1.4;
+      font-size: 14px;
+    }
+
+    .confirm-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .confirm-row input {
+      letter-spacing: 0;
+      text-transform: none;
+      font-size: 16px;
+      min-height: 48px;
+    }
+
+    body.entry-mode .wrap {
+      max-width: 720px;
+      padding-top: 12px;
+    }
+
+    body.entry-mode header,
+    body.entry-mode .top-status,
+    body.entry-mode .secondary-section {
+      display: none;
+    }
+
+    body.entry-mode .setup-card {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      margin: 0 0 10px;
+    }
+
+    body.entry-mode .setup-card .session-row {
+      display: block;
+    }
+
+    body.entry-mode .setup-card .session-row > div,
+    body.entry-mode .setup-card .two-col,
+    body.entry-mode .setup-card .help {
+      display: none;
+    }
+
+    body.entry-mode #entryModeBtn {
+      width: 100%;
+      min-height: 58px;
+      font-size: 18px;
+      border-width: 2px;
+    }
+
+    body.entry-mode .grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin: 10px 0;
+    }
+
+    body.entry-mode .metric {
+      min-height: 66px;
+      padding: 8px 6px;
+      border-radius: 14px;
+      text-align: center;
+    }
+
+    body.entry-mode .metric .label {
+      font-size: 11px;
+      line-height: 1.15;
+      margin-bottom: 5px;
+    }
+
+    body.entry-mode .metric .value {
+      font-size: 18px;
+      line-height: 1.05;
+    }
+
+    body.entry-mode .card.entry-card {
+      border-width: 2px;
+      margin-top: 10px;
+    }
+
+    body.entry-mode .notes-group,
+    body.entry-mode #entryHelp,
+    body.entry-mode .entry-card .actions {
+      display: none;
+    }
+
+    body.entry-mode #containerInput {
+      font-size: 40px;
+      min-height: 78px;
+    }
+
+    body.entry-mode .status {
+      font-size: 18px;
+      font-weight: 700;
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+    }
+
+    @media (max-width: 820px) {
+      .wrap { padding: 14px; }
+      h1 { font-size: 25px; }
+
+      .grid,
+      .summary-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      body.entry-mode .grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .entry-row {
+        flex-direction: column;
+      }
+
+      .session-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .two-col,
+      .three-col,
+      .confirm-row,
+      .edit-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .actions,
+      .actions.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .actions.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .actions button {
+        font-size: 13px;
+        padding: 10px 8px;
+      }
+
+      .edit-grid .full { grid-column: auto; }
+
+      .entry-row .primary { width: 100%; }
+
+      #containerInput {
+        font-size: 26px;
+        min-height: 62px;
+      }
+
+      .row {
+        grid-template-columns: 52px 1fr;
+      }
+
+      .row-actions {
+        grid-column: 1 / -1;
+        justify-content: stretch;
+      }
+
+      .row-actions button { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>Zippy Shell Inventory App</h1>
+      <p class="sub">Optional customer name, condition, status, and a 6-character container number.</p>
+      <div class="top-status">
+        <span id="lockBadge" class="badge unlocked">Editing Unlocked</span>
+        <span id="xlsxBadge" class="badge">XLSX loading…</span>
+      </div>
+    </header>
+
+    <section class="card setup-card">
+      <div class="session-row">
+        <div>
+          <label for="sessionName">Inventory session name</label>
+          <input id="sessionName" type="text" autocomplete="off" placeholder="Example: Zippy Shell June Inventory" />
+        </div>
+        <button id="entryModeBtn" type="button">Big Entry Mode</button>
+      </div>
+
+      <div class="two-col" style="margin-top: 12px;">
+        <div>
+          <label for="employeeInitials">Employee/User initials</label>
+          <input id="employeeInitials" type="text" autocomplete="off" maxlength="8" placeholder="Example: DS" />
+        </div>
+      </div>
+
+      <p class="help">Session name and initials are included in the XLSX export and final report. Customer Name is optional. Container Size is removed.</p>
+    </section>
+
+    <section class="grid" aria-label="Inventory summary">
+      <div class="metric">
+        <div class="label">Active Entries</div>
+        <div class="value" id="count">0</div>
+      </div>
+      <div class="metric">
+        <div class="label">Deleted Entries</div>
+        <div class="value" id="deletedMetric">0</div>
+      </div>
+      <div class="metric">
+        <div class="label">Last Container Number</div>
+        <div class="value" id="lastEntryMetric">—</div>
+      </div>
+      <div class="metric">
+        <div class="label">Last Saved</div>
+        <div class="value" id="lastSaved">—</div>
+      </div>
+    </section>
+
+    <section class="card entry-card">
+      <div class="field-group">
+        <label for="customerNameInput">Customer Name <span class="small">(optional)</span></label>
+        <input id="customerNameInput" type="text" autocomplete="off" placeholder="Optional customer name" />
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">Container Condition</div>
+        <div class="option-grid" role="radiogroup" aria-label="Container Condition">
+          <label class="option-pill">
+            <input type="radio" name="containerCondition" value="Good" checked />
+            Good
+          </label>
+          <label class="option-pill">
+            <input type="radio" name="containerCondition" value="Bad" />
+            Bad
+          </label>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">Container Status</div>
+        <div class="option-grid" role="radiogroup" aria-label="Container Status">
+          <label class="option-pill">
+            <input type="radio" name="containerStatus" value="Built" checked />
+            Built
+          </label>
+          <label class="option-pill">
+            <input type="radio" name="containerStatus" value="Flat" />
+            Flat
+          </label>
+        </div>
+      </div>
+
+      <div class="field-group notes-group">
+        <label for="notesInput">Notes</label>
+        <textarea id="notesInput" autocomplete="off" placeholder="Optional notes, damage comments, missing label, etc."></textarea>
+      </div>
+
+      <label for="containerInput">Container number</label>
+      <div class="entry-row">
+        <input
+          id="containerInput"
+          type="text"
+          inputmode="text"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          maxlength="6"
+          placeholder="ABC123"
+          aria-describedby="entryHelp status"
+        />
+        <button id="addBtn" class="primary" type="button">Enter</button>
+      </div>
+      <div id="status" class="status" role="status" aria-live="polite">Ready for first container.</div>
+      <p id="entryHelp" class="help">
+        Accepted format: exactly 6 letters/numbers. Entry numbers are permanent, so deleted numbers are not reused.
+      </p>
+
+      <div class="actions">
+        <button id="exportXlsxBtn" type="button">Export XLSX</button>
+        <button id="finalExportBtn" class="success-solid" type="button">Final Export + Lock</button>
+        <button id="undoBtn" type="button">Undo Last Entry</button>
+        <button id="copyBtn" type="button">Copy Active List</button>
+        <button id="backupJsonBtn" type="button">Export Backup JSON</button>
+        <button id="unlockBtn" type="button">Unlock Editing</button>
+        <button id="focusEntryBtn" type="button">Focus Entry Box</button>
+        <button id="exportCsvBtn" type="button">Export CSV Backup</button>
+        <button id="toggleImportBtn" type="button">Import / Restore</button>
+      </div>
+
+      <div id="importPanel" class="compact-import-panel" hidden>
+        <div class="list-head">
+          <h2>Import / Restore from Backup</h2>
+          <span class="small">JSON, CSV, or XLSX</span>
+        </div>
+        <input id="backupFileInput" type="file" accept=".json,.csv,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+        <div class="actions two">
+          <button id="importBackupBtn" type="button">Import Backup</button>
+          <button id="clearFileBtn" type="button">Clear Selected File</button>
+        </div>
+        <p class="help">Import replaces the current active/deleted lists after confirmation. Export Backup JSON is the safest restore format.</p>
+      </div>
+    </section>
+
+    <section class="card secondary-section">
+      <div class="list-head">
+        <h2>Search Active Entries</h2>
+        <span class="small" id="searchCountText">Showing all</span>
+      </div>
+      <input id="searchInput" type="text" autocomplete="off" placeholder="Search by container number, entry #, customer name, condition, status, initials, or notes" />
+
+      <div id="editPanel" class="edit-panel">
+        <h3 id="editTitle">Edit Entry</h3>
+        <div class="edit-grid">
+          <div class="full">
+            <label for="editCode">Container number</label>
+            <input id="editCode" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          </div>
+          <div class="full">
+            <label for="editCustomerName">Customer Name</label>
+            <input id="editCustomerName" type="text" autocomplete="off" placeholder="Optional customer name" />
+          </div>
+          <div>
+            <label for="editCondition">Container Condition</label>
+            <select id="editCondition">
+              <option value="Good">Good</option>
+              <option value="Bad">Bad</option>
+            </select>
+          </div>
+          <div>
+            <label for="editStatus">Container Status</label>
+            <select id="editStatus">
+              <option value="Built">Built</option>
+              <option value="Flat">Flat</option>
+            </select>
+          </div>
+          <div>
+            <label for="editInitials">Employee/User initials</label>
+            <input id="editInitials" type="text" maxlength="8" autocomplete="off" />
+          </div>
+          <div class="full">
+            <label for="editNotes">Notes</label>
+            <textarea id="editNotes" autocomplete="off"></textarea>
+          </div>
+          <div class="actions two full">
+            <button id="saveEditBtn" class="primary" type="button">Save Edit</button>
+            <button id="cancelEditBtn" type="button">Cancel Edit</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card secondary-section">
+      <div class="list-head">
+        <h2>Summary Totals</h2>
+        <span class="small" id="summaryText">Active entries only</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-box">
+          <h3>By Condition</h3>
+          <div id="conditionSummary"></div>
+        </div>
+        <div class="summary-box">
+          <h3>By Status</h3>
+          <div id="statusSummary"></div>
+        </div>
+        <div class="summary-box">
+          <h3>By Initials</h3>
+          <div id="initialsSummary"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card secondary-section">
+      <details class="collapsible-section">
+        <summary class="section-toggle">Final Inventory Report</summary>
+        <div class="section-body">
+          <div class="list-head">
+            <h2>Final Inventory Report</h2>
+            <span class="small" id="reportUpdatedText">Auto-generated</span>
+          </div>
+          <div id="finalReport" class="report-box"></div>
+          <div class="actions two">
+            <button id="copyReportBtn" type="button">Copy Report</button>
+            <button id="downloadReportBtn" type="button">Download Report TXT</button>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section class="card secondary-section">
+      <div class="list-head">
+        <h2>Active Entries</h2>
+        <span class="small" id="savedText">Saved on this device</span>
+      </div>
+      <div id="list" class="inventory-list"></div>
+    </section>
+
+    <section class="card secondary-section">
+      <div class="list-head">
+        <h2>Deleted Entries</h2>
+        <span class="small" id="deletedCountText">0 deleted</span>
+      </div>
+      <div id="deletedList" class="inventory-list"></div>
+      <div class="actions two">
+        <button id="exportDeletedCsvBtn" type="button">Export Deleted CSV</button>
+        <button id="copyDeletedBtn" type="button">Copy Deleted List</button>
+      </div>
+      <p class="help">
+        Deleted entries stay here until the finished list is cleared. You can restore a deleted entry with the same original entry number.
+      </p>
+    </section>
+
+    <section class="card secondary-section">
+      <details class="finish-clear">
+        <summary>Finished inventory? Open export/clear controls</summary>
+        <div class="confirm-panel">
+          <p>
+            Use <strong>Final Export + Lock</strong> first. To clear the entire list after finishing,
+            type <strong>FINISHED</strong> below, then press the clear button.
+          </p>
+          <div class="confirm-row">
+            <input
+              id="finishConfirm"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Type FINISHED"
+            />
+            <button id="finishClearBtn" class="danger-solid" type="button">Clear Finished List</button>
+          </div>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "zippy_shell_inventory_entries_v1";
+    const OLD_KEYS = [];
+    const DELETED_KEY = "zippy_shell_inventory_deleted_entries_v1";
+    const OLD_DELETED_KEYS = [];
+    const DUPE_KEY = "zippy_shell_inventory_dupes_v1";
+    const OLD_DUPE_KEYS = [];
+    const NEXT_SEQUENCE_KEY = "zippy_shell_inventory_next_sequence_v1";
+    const OLD_NEXT_KEYS = [];
+    const SESSION_KEY = "zippy_shell_inventory_session_name_v1";
+    const INITIALS_KEY = "zippy_shell_inventory_initials_v1";
+    const LAST_SAVED_KEY = "zippy_shell_inventory_last_saved_v1";
+    const FINAL_EXPORT_SIGNATURE_KEY = "zippy_shell_inventory_final_export_signature_v1";
+    const EDIT_LOCKED_KEY = "zippy_shell_inventory_edit_locked_v1";
+    const ENTRY_MODE_KEY = "zippy_shell_inventory_entry_mode_v1";
+
+    const input = document.getElementById("containerInput");
+    const notesInput = document.getElementById("notesInput");
+    const customerNameInput = document.getElementById("customerNameInput");
+    const sessionNameInput = document.getElementById("sessionName");
+    const employeeInitialsInput = document.getElementById("employeeInitials");
+
+    const addBtn = document.getElementById("addBtn");
+    const exportXlsxBtn = document.getElementById("exportXlsxBtn");
+    const finalExportBtn = document.getElementById("finalExportBtn");
+
