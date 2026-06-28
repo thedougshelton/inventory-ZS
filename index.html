@@ -8,7 +8,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#0f172a" />
   <title>Zippy Shell Inventory App</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- try local vendor first, fall back to CDN if missing -->
+  <script src="assets/js/xlsx.full.min.js"></script>
+  <script>
+    if (!window.XLSX) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = function(){ console.log('XLSX loaded from CDN'); };
+      s.onerror = function(){ console.warn('XLSX CDN failed to load'); };
+      document.head.appendChild(s);
+    }
+  </script>
   <style>
     :root {
       --bg: #f8fafc;
@@ -841,7 +851,7 @@
       </div>
     </section>
 
-<section class="card secondary-section">
+    <section class="card secondary-section">
       <div class="list-head">
         <h2>Search Active Entries</h2>
         <span class="small" id="searchCountText">Showing all</span>
@@ -1001,22 +1011,15 @@
     const undoBtn = document.getElementById("undoBtn");
     const copyBtn = document.getElementById("copyBtn");
     const backupJsonBtn = document.getElementById("backupJsonBtn");
-    const unlockBtn = document.getElementById("unlockBtn");
     const focusEntryBtn = document.getElementById("focusEntryBtn");
     const exportCsvBtn = document.getElementById("exportCsvBtn");
     const toggleImportBtn = document.getElementById("toggleImportBtn");
-    const importPanel = document.getElementById("importPanel");
-    const entryModeBtn = document.getElementById("entryModeBtn");
-
-    const backupFileInput = document.getElementById("backupFileInput");
     const importBackupBtn = document.getElementById("importBackupBtn");
     const clearFileBtn = document.getElementById("clearFileBtn");
+    const backupFileInput = document.getElementById("backupFileInput");
 
-    const finishConfirm = document.getElementById("finishConfirm");
-    const finishClearBtn = document.getElementById("finishClearBtn");
     const exportDeletedCsvBtn = document.getElementById("exportDeletedCsvBtn");
     const copyDeletedBtn = document.getElementById("copyDeletedBtn");
-    const searchInput = document.getElementById("searchInput");
 
     const editPanel = document.getElementById("editPanel");
     const editTitle = document.getElementById("editTitle");
@@ -1029,1473 +1032,126 @@
     const saveEditBtn = document.getElementById("saveEditBtn");
     const cancelEditBtn = document.getElementById("cancelEditBtn");
 
-    const count = document.getElementById("count");
-    const deletedMetric = document.getElementById("deletedMetric");
-    const lastEntryMetric = document.getElementById("lastEntryMetric");
-    const lastSaved = document.getElementById("lastSaved");
+    const searchInput = document.getElementById("searchInput");
+    const listEl = document.getElementById("list");
+    const deletedListEl = document.getElementById("deletedList");
+
+    const countEl = document.getElementById("count");
+    const deletedMetricEl = document.getElementById("deletedMetric");
+    const lastEntryMetricEl = document.getElementById("lastEntryMetric");
+    const lastSavedEl = document.getElementById("lastSaved");
+
+    const statusEl = document.getElementById("status");
     const lockBadge = document.getElementById("lockBadge");
     const xlsxBadge = document.getElementById("xlsxBadge");
-    const statusBox = document.getElementById("status");
-    const list = document.getElementById("list");
-    const deletedList = document.getElementById("deletedList");
-    const deletedCountText = document.getElementById("deletedCountText");
-    const savedText = document.getElementById("savedText");
-    const searchCountText = document.getElementById("searchCountText");
+
     const conditionSummary = document.getElementById("conditionSummary");
     const statusSummary = document.getElementById("statusSummary");
     const initialsSummary = document.getElementById("initialsSummary");
-    const finalReport = document.getElementById("finalReport");
-    const reportUpdatedText = document.getElementById("reportUpdatedText");
+
+    const finalReportEl = document.getElementById("finalReport");
     const copyReportBtn = document.getElementById("copyReportBtn");
     const downloadReportBtn = document.getElementById("downloadReportBtn");
 
-    let entries = loadEntries();
-    let deletedEntries = loadDeletedEntries();
-    let duplicateBlocks = loadNumberFromKeys([DUPE_KEY, ...OLD_DUPE_KEYS], 0);
-    let nextSequence = loadNextSequence();
-    let lastSavedAt = localStorage.getItem(LAST_SAVED_KEY) || "";
-    let finalExportSignature = localStorage.getItem(FINAL_EXPORT_SIGNATURE_KEY) || "";
-    let editLocked = localStorage.getItem(EDIT_LOCKED_KEY) === "true";
-    let editingSequence = null;
+    const finishConfirm = document.getElementById("finishConfirm");
+    const finishClearBtn = document.getElementById("finishClearBtn");
 
-    sessionNameInput.value = localStorage.getItem(SESSION_KEY) || defaultSessionName();
-    employeeInitialsInput.value = localStorage.getItem(INITIALS_KEY) || "";
+    const sessionNameKey = SESSION_KEY;
 
-    if (localStorage.getItem(ENTRY_MODE_KEY) === "true") {
-      document.body.classList.add("entry-mode");
-    }
+    let entries = [];
+    let deleted = [];
+    let dupes = [];
+    let nextSequence = 1;
+    let editId = null;
+    let editIsDeleted = false;
+    let xlsxLoaded = false;
 
-    function defaultSessionName() {
-      const now = new Date();
-      return "Zippy Shell Inventory " + (now.getMonth() + 1) + "/" + now.getDate() + "/" + now.getFullYear();
-    }
-
-    function firstLocalStorageValue(keys) {
-      for (const key of keys) {
-        const value = localStorage.getItem(key);
-        if (value !== null && value !== undefined) return value;
-      }
-      return null;
-    }
-
-    function loadNumberFromKeys(keys, fallback) {
-      const raw = firstLocalStorageValue(keys);
-      const number = Number(raw);
-      return Number.isFinite(number) ? number : fallback;
-    }
-
-    function getRadioValue(name) {
-      const checked = document.querySelector('input[name="' + name + '"]:checked');
-      return checked ? checked.value : "";
-    }
-
-    function normalizeEntry(item, fallbackSequence) {
-      const existingSequence = Number(item.sequence || item["Entry Number"] || item.entryNumber);
-      const sequence = Number.isFinite(existingSequence) && existingSequence > 0
-        ? existingSequence
-        : fallbackSequence;
-
-      return {
-        sequence,
-        code: String(item.code || item["Container Number"] || item.containerNumber || "").toUpperCase(),
-        customerName: item.customerName || item["Customer Name"] || "",
-        condition: item.condition || item["Container Condition"] || item.containerCondition || "Good",
-        status: item.status || item["Container Status"] || item.containerStatus || "Built",
-        initials: item.initials || item["Employee/User Initials"] || item["Initials"] || "",
-        notes: item.notes || item["Notes"] || "",
-        timestamp: item.timestamp || item["Date/Time Entered"] || item.dateTimeEntered || new Date().toISOString(),
-        editedAt: item.editedAt || item["Edited Date/Time"] || "",
-        restoredAt: item.restoredAt || ""
-      };
-    }
-
-    function normalizeDeleted(item, fallbackSequence) {
-      const base = normalizeEntry(item, fallbackSequence);
-      return {
-        ...base,
-        originalTimestamp: item.originalTimestamp || item["Original Date/Time Entered"] || item.timestamp || item["Date/Time Entered"] || "",
-        deletedAt: item.deletedAt || item["Deleted Date/Time"] || new Date().toISOString(),
-        deleteType: item.deleteType || item["Deleted By"] || "Imported Deleted Entry"
-      };
-    }
-
-    function loadEntries() {
+    function loadLocal() {
       try {
-        const raw = firstLocalStorageValue([STORAGE_KEY, ...OLD_KEYS]);
-        const parsed = raw ? JSON.parse(raw) : [];
-        let fallbackSequence = 1;
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) entries = JSON.parse(raw) || [];
+      } catch (e) { entries = []; }
 
-        return parsed.map(item => {
-          const normalized = normalizeEntry(item, fallbackSequence);
-          fallbackSequence = Math.max(fallbackSequence + 1, normalized.sequence + 1);
-          return normalized;
-        }).filter(item => item.code);
-      } catch {
-        return [];
-      }
-    }
-
-    function loadDeletedEntries() {
       try {
-        const raw = firstLocalStorageValue([DELETED_KEY, ...OLD_DELETED_KEYS]);
-        const parsed = raw ? JSON.parse(raw) : [];
-        let fallbackSequence = 1;
+        const rawDeleted = localStorage.getItem(DELETED_KEY);
+        if (rawDeleted) deleted = JSON.parse(rawDeleted) || [];
+      } catch (e) { deleted = []; }
 
-        return parsed.map(item => {
-          const normalized = normalizeDeleted(item, fallbackSequence);
-          fallbackSequence = Math.max(fallbackSequence + 1, normalized.sequence + 1);
-          return normalized;
-        }).filter(item => item.code);
-      } catch {
-        return [];
-      }
+      try {
+        const rawNext = localStorage.getItem(NEXT_SEQUENCE_KEY);
+        if (rawNext) nextSequence = parseInt(rawNext, 10) || nextSequence;
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawDupes = localStorage.getItem(DUPE_KEY);
+        if (rawDupes) dupes = JSON.parse(rawDupes) || [];
+      } catch (e) { dupes = []; }
+
+      try {
+        const rawSession = localStorage.getItem(SESSION_KEY);
+        if (rawSession) sessionNameInput.value = rawSession;
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawInitials = localStorage.getItem(INITIALS_KEY);
+        if (rawInitials) employeeInitialsInput.value = rawInitials;
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawLastSaved = localStorage.getItem(LAST_SAVED_KEY);
+        if (rawLastSaved) lastSavedEl.textContent = rawLastSaved;
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawLocked = localStorage.getItem(EDIT_LOCKED_KEY);
+        if (rawLocked === "true") setLocked(true);
+      } catch (e) { /* ignore */ }
+
+      try {
+        const rawEntryMode = localStorage.getItem(ENTRY_MODE_KEY);
+        if (rawEntryMode === "true") document.body.classList.add('entry-mode');
+      } catch (e) { /* ignore */ }
     }
 
-    function loadNextSequence() {
-      const savedNext = loadNumberFromKeys([NEXT_SEQUENCE_KEY, ...OLD_NEXT_KEYS], 0);
-      const highestActive = entries.reduce((highest, item) => Math.max(highest, Number(item.sequence) || 0), 0);
-      const highestDeleted = deletedEntries.reduce((highest, item) => Math.max(highest, Number(item.sequence) || 0), 0);
-      const highestExisting = Math.max(highestActive, highestDeleted);
-
-      if (Number.isFinite(savedNext) && savedNext > highestExisting) {
-        return savedNext;
-      }
-
-      return highestExisting + 1;
-    }
-
-    function saveEntries() {
-      lastSavedAt = new Date().toISOString();
+    function saveLocal() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-      localStorage.setItem(DELETED_KEY, JSON.stringify(deletedEntries));
-      localStorage.setItem(DUPE_KEY, String(duplicateBlocks));
+      localStorage.setItem(DELETED_KEY, JSON.stringify(deleted));
+      localStorage.setItem(DUPE_KEY, JSON.stringify(dupes));
       localStorage.setItem(NEXT_SEQUENCE_KEY, String(nextSequence));
-      localStorage.setItem(SESSION_KEY, sessionNameInput.value.trim());
-      localStorage.setItem(INITIALS_KEY, employeeInitialsInput.value.trim().toUpperCase());
-      localStorage.setItem(LAST_SAVED_KEY, lastSavedAt);
-      localStorage.setItem(EDIT_LOCKED_KEY, editLocked ? "true" : "false");
-      savedText.textContent = "Saved on this device";
+      localStorage.setItem(SESSION_KEY, sessionNameInput.value || '');
+      localStorage.setItem(INITIALS_KEY, employeeInitialsInput.value || '');
+      localStorage.setItem(LAST_SAVED_KEY, new Date().toLocaleString());
+      lastSavedEl.textContent = new Date().toLocaleString();
     }
 
-    function normalizeCode(value) {
-      return value.trim().toUpperCase().replace(/\s+/g, "");
-    }
-
-    function normalizeInitials(value) {
-      return value.trim().toUpperCase().replace(/\s+/g, "");
-    }
-
-    function normalizeSearch(value) {
-      return value.trim().toUpperCase();
-    }
-
-    function isValid(code) {
-      return /^[A-Z0-9]{6}$/.test(code);
-    }
-
-    function setStatus(message, type) {
-      statusBox.textContent = message;
-      statusBox.className = "status" + (type ? " " + type : "");
-    }
-
-    function formatLocalTime(iso) {
-      if (!iso) return "";
-      const date = new Date(iso);
-      if (isNaN(date.getTime())) return String(iso);
-      return date.toLocaleString();
-    }
-
-    function formatShortTime(iso) {
-      if (!iso) return "—";
-      const date = new Date(iso);
-      if (isNaN(date.getTime())) return "—";
-      return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
-
-    function todayStamp() {
-      const now = new Date();
-      return now.toLocaleDateString();
-    }
-
-    function currentSignature() {
-      return JSON.stringify({
-        session: sessionNameInput.value.trim(),
-        active: entries.map(item => [item.sequence, item.code, item.customerName || "", item.condition, item.status, item.initials || "", item.notes || "", item.timestamp, item.editedAt || ""]),
-        deleted: deletedEntries.map(item => [item.sequence, item.code, item.customerName || "", item.condition, item.status, item.initials || "", item.notes || "", item.deletedAt || "", item.deleteType || ""])
-      });
-    }
-
-    function hasFreshFinalExport() {
-      return Boolean(finalExportSignature) && finalExportSignature === currentSignature();
-    }
-
-    function markFinalExportedAndLocked() {
-      finalExportSignature = currentSignature();
-      editLocked = true;
-      localStorage.setItem(FINAL_EXPORT_SIGNATURE_KEY, finalExportSignature);
-      localStorage.setItem(EDIT_LOCKED_KEY, "true");
-    }
-
-    function requireUnlocked(actionText) {
-      if (!editLocked) return false;
-      setStatus("Editing is locked after final export. Unlock editing before you " + actionText + ".", "error");
-      return true;
-    }
-
-    function addEntry() {
-      if (requireUnlocked("add another entry")) return;
-
-      const code = normalizeCode(input.value);
-      const customerName = customerNameInput.value.trim();
-      const condition = getRadioValue("containerCondition");
-      const containerStatus = getRadioValue("containerStatus");
-      const initials = normalizeInitials(employeeInitialsInput.value);
-      const notes = document.body.classList.contains("entry-mode") ? "" : notesInput.value.trim();
-
-      if (!condition) {
-        setStatus("Select a container condition first.", "warning");
-        return;
-      }
-
-      if (!containerStatus) {
-        setStatus("Select a container status first.", "warning");
-        return;
-      }
-
-      if (!code) {
-        setStatus("Type a container number first.", "warning");
-        input.focus();
-        return;
-      }
-
-      if (!isValid(code)) {
-        setStatus("Invalid entry. Container number must be exactly 6 letters/numbers.", "error");
-        input.select();
-        return;
-      }
-
-      const existing = entries.find(item => item.code === code);
-      if (existing) {
-        duplicateBlocks += 1;
-        saveEntries();
-        setStatus(
-          "Duplicate blocked: " + code + " is already active as entry #" + existing.sequence +
-          " — " + (existing.customerName || "No Customer Name") + ", " + existing.condition + ", " + existing.status + ".",
-          "warning"
-        );
-        input.select();
-        render();
-        return;
-      }
-
-      const deletedMatch = deletedEntries.find(item => item.code === code);
-      if (deletedMatch) {
-        duplicateBlocks += 1;
-        saveEntries();
-        setStatus(
-          "Duplicate found in deleted entries: " + code + " was deleted as entry #" + deletedMatch.sequence +
-          ". Use Restore in the Deleted Entries section if this should be active again.",
-          "warning"
-        );
-        input.select();
-        render();
-        return;
-      }
-
-      const sequence = nextSequence;
-      nextSequence += 1;
-
-      entries.push({
-        sequence,
-        code,
-        customerName,
-        condition,
-        status: containerStatus,
-        initials,
-        notes,
-        timestamp: new Date().toISOString(),
-        editedAt: "",
-        restoredAt: ""
-      });
-
-      input.value = "";
-      notesInput.value = "";
-      saveEntries();
-
-      if (entries.length % 100 === 0) {
-        setStatus("Saved #" + sequence + " " + code + ". Backup recommended at " + entries.length + " entries — tap Export XLSX or Export Backup JSON.", "warning");
+    function setLocked(locked) {
+      if (locked) {
+        lockBadge.textContent = 'Editing Locked';
+        lockBadge.classList.remove('unlocked');
+        lockBadge.classList.add('locked');
+        localStorage.setItem(EDIT_LOCKED_KEY, 'true');
       } else {
-        setStatus("Saved #" + sequence + " " + code + " — " + condition + ", " + containerStatus + ". Ready for next container.", "success");
-      }
-
-      render();
-      input.focus();
-    }
-
-    function logDeletedEntry(item, deleteType) {
-      deletedEntries.push({
-        sequence: item.sequence || "",
-        code: item.code || "",
-        customerName: item.customerName || "",
-        condition: item.condition || "",
-        status: item.status || "",
-        initials: item.initials || "",
-        notes: item.notes || "",
-        timestamp: item.timestamp || "",
-        originalTimestamp: item.timestamp || "",
-        editedAt: item.editedAt || "",
-        restoredAt: item.restoredAt || "",
-        deletedAt: new Date().toISOString(),
-        deleteType
-      });
-    }
-
-    function undoLast() {
-      if (requireUnlocked("undo an entry")) return;
-
-      if (!entries.length) {
-        setStatus("There is nothing to undo.", "warning");
-        input.focus();
-        return;
-      }
-
-      const removed = entries.pop();
-      logDeletedEntry(removed, "Undo Last Entry");
-      saveEntries();
-      setStatus("Removed last entry #" + removed.sequence + ": " + removed.code + ". It was added to Deleted Entries.", "warning");
-      render();
-      input.focus();
-    }
-
-    function deleteEntry(sequence) {
-      if (requireUnlocked("delete an entry")) return;
-
-      const index = entries.findIndex(item => item.sequence === sequence);
-      if (index === -1) {
-        setStatus("Could not find that entry to delete.", "error");
-        return;
-      }
-
-      const removed = entries.splice(index, 1)[0];
-      logDeletedEntry(removed, "Deleted Individually");
-      saveEntries();
-      setStatus("Deleted #" + removed.sequence + " " + removed.code + ". It was added to Deleted Entries.", "warning");
-      render();
-      input.focus();
-    }
-
-    function restoreDeletedEntry(sequence) {
-      if (requireUnlocked("restore a deleted entry")) return;
-
-      const index = deletedEntries.findIndex(item => Number(item.sequence) === Number(sequence));
-      if (index === -1) {
-        setStatus("Could not find that deleted entry to restore.", "error");
-        return;
-      }
-
-      const item = deletedEntries[index];
-      const activeDuplicate = entries.find(active => active.code === item.code);
-      if (activeDuplicate) {
-        setStatus("Cannot restore " + item.code + ". It is already active as entry #" + activeDuplicate.sequence + ".", "error");
-        return;
-      }
-
-      deletedEntries.splice(index, 1);
-      entries.push({
-        sequence: Number(item.sequence),
-        code: item.code,
-        customerName: item.customerName || "",
-        condition: item.condition || "Good",
-        status: item.status || "Built",
-        initials: item.initials || "",
-        notes: item.notes || "",
-        timestamp: item.originalTimestamp || item.timestamp || new Date().toISOString(),
-        editedAt: item.editedAt || "",
-        restoredAt: new Date().toISOString()
-      });
-
-      entries.sort((a, b) => Number(a.sequence) - Number(b.sequence));
-      nextSequence = Math.max(nextSequence, ...entries.map(e => Number(e.sequence) || 0), ...deletedEntries.map(e => Number(e.sequence) || 0)) + 1;
-      saveEntries();
-      setStatus("Restored #" + item.sequence + " " + item.code + " back to Active Entries.", "success");
-      render();
-      input.focus();
-    }
-
-    function startEdit(sequence) {
-      if (requireUnlocked("edit an entry")) return;
-
-      const item = entries.find(entry => entry.sequence === sequence);
-      if (!item) {
-        setStatus("Could not find that entry to edit.", "error");
-        return;
-      }
-
-      editingSequence = sequence;
-      editTitle.textContent = "Edit Entry #" + sequence;
-      editCode.value = item.code;
-      editCustomerName.value = item.customerName || "";
-      editCondition.value = item.condition || "Good";
-      editStatus.value = item.status || "Built";
-      editInitials.value = item.initials || "";
-      editNotes.value = item.notes || "";
-      editPanel.classList.add("open");
-      editCode.focus();
-      editCode.select();
-    }
-
-    function cancelEdit() {
-      editingSequence = null;
-      editPanel.classList.remove("open");
-      editCode.value = "";
-      input.focus();
-    }
-
-    function saveEdit() {
-      if (requireUnlocked("save an edit")) return;
-
-      if (editingSequence === null) {
-        setStatus("No entry is selected for editing.", "warning");
-        return;
-      }
-
-      const item = entries.find(entry => entry.sequence === editingSequence);
-      if (!item) {
-        setStatus("Could not find that entry to save.", "error");
-        cancelEdit();
-        return;
-      }
-
-      const code = normalizeCode(editCode.value);
-      if (!isValid(code)) {
-        setStatus("Edit not saved. Container number must be exactly 6 letters/numbers.", "error");
-        editCode.select();
-        return;
-      }
-
-      const activeDuplicate = entries.find(entry => entry.code === code && entry.sequence !== editingSequence);
-      if (activeDuplicate) {
-        setStatus("Edit not saved. " + code + " is already active as entry #" + activeDuplicate.sequence + ".", "error");
-        editCode.select();
-        return;
-      }
-
-      const deletedDuplicate = deletedEntries.find(entry => entry.code === code);
-      if (deletedDuplicate) {
-        setStatus("Edit not saved. " + code + " exists in Deleted Entries as entry #" + deletedDuplicate.sequence + ".", "error");
-        editCode.select();
-        return;
-      }
-
-      item.code = code;
-      item.customerName = editCustomerName.value.trim();
-      item.condition = editCondition.value;
-      item.status = editStatus.value;
-      item.initials = normalizeInitials(editInitials.value);
-      item.notes = editNotes.value.trim();
-      item.editedAt = new Date().toISOString();
-
-      saveEntries();
-      setStatus("Saved edit for #" + item.sequence + " " + item.code + ".", "success");
-      cancelEdit();
-      render();
-    }
-
-    function unlockEditing() {
-      if (!editLocked) {
-        setStatus("Editing is already unlocked.", "info");
-        input.focus();
-        return;
-      }
-
-      const phrase = prompt("Type UNLOCK to unlock editing after final export.");
-      if (!phrase || phrase.trim().toUpperCase() !== "UNLOCK") {
-        setStatus("Editing remains locked.", "warning");
-        return;
-      }
-
-      editLocked = false;
-      localStorage.setItem(EDIT_LOCKED_KEY, "false");
-      setStatus("Editing unlocked. Make another Final Export + Lock when finished.", "success");
-      render();
-      input.focus();
-    }
-
-    function clearFinishedList() {
-      if (!entries.length && !deletedEntries.length) {
-        setStatus("The list is already empty.", "warning");
-        finishConfirm.value = "";
-        input.focus();
-        return;
-      }
-
-      if (!hasFreshFinalExport() || !editLocked) {
-        setStatus("Use Final Export + Lock first. The clear button is locked until the current list has been exported and editing is locked.", "error");
-        finalExportBtn.focus();
-        return;
-      }
-
-      if (finishConfirm.value.trim().toUpperCase() !== "FINISHED") {
-        setStatus("To clear the entire list, type FINISHED in the confirmation box first.", "error");
-        finishConfirm.focus();
-        return;
-      }
-
-      const ok = confirm("This will permanently clear all active and deleted entries from this device. Make sure you saved the final XLSX first.");
-      if (!ok) return;
-
-      entries = [];
-      deletedEntries = [];
-      duplicateBlocks = 0;
-      nextSequence = 1;
-      finishConfirm.value = "";
-      finalExportSignature = "";
-      editLocked = false;
-      localStorage.removeItem(FINAL_EXPORT_SIGNATURE_KEY);
-      localStorage.setItem(EDIT_LOCKED_KEY, "false");
-      saveEntries();
-      render();
-      setStatus("Finished list cleared. Ready for a new inventory.", "success");
-      input.focus();
-    }
-
-    function csvEscape(value) {
-      const text = String(value ?? "");
-      if (/[",\n\r]/.test(text)) {
-        return '"' + text.replace(/"/g, '""') + '"';
-      }
-      return text;
-    }
-
-    function csvLine(values) {
-      return values.map(csvEscape).join(",");
-    }
-
-    function parseCsv(text) {
-      const rows = [];
-      let row = [];
-      let value = "";
-      let inQuotes = false;
-
-      for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        const next = text[i + 1];
-
-        if (char === '"' && inQuotes && next === '"') {
-          value += '"';
-          i++;
-        } else if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === "," && !inQuotes) {
-          row.push(value);
-          value = "";
-        } else if ((char === "\n" || char === "\r") && !inQuotes) {
-          if (char === "\r" && next === "\n") i++;
-          row.push(value);
-          rows.push(row);
-          row = [];
-          value = "";
-        } else {
-          value += char;
-        }
-      }
-
-      row.push(value);
-      rows.push(row);
-      return rows.filter(r => r.some(cell => String(cell).trim() !== ""));
-    }
-
-    function safeFilePart(value) {
-      return String(value || "zippy_shell_inventory")
-        .trim()
-        .replace(/[^a-z0-9]+/gi, "_")
-        .replace(/^_+|_+$/g, "")
-        .slice(0, 50) || "zippy_shell_inventory";
-    }
-
-    function dateStamp() {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const dd = String(now.getDate()).padStart(2, "0");
-      return yyyy + "-" + mm + "-" + dd;
-    }
-
-    function downloadBlob(content, filename, type) {
-      const blob = new Blob([content], { type });
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-
-    function activeArray() {
-      return entries.map(item => ({
-        "Entry Number": item.sequence || "",
-        "Customer Name": item.customerName || "",
-        "Container Number": item.code || "",
-        "Container Condition": item.condition || "",
-        "Container Status": item.status || "",
-        "Employee/User Initials": item.initials || "",
-        "Notes": item.notes || "",
-        "Date/Time Entered": formatLocalTime(item.timestamp),
-        "Edited Date/Time": formatLocalTime(item.editedAt),
-        "Restored Date/Time": formatLocalTime(item.restoredAt)
-      }));
-    }
-
-    function deletedArray() {
-      return deletedEntries.map(item => ({
-        "Entry Number": item.sequence || "",
-        "Customer Name": item.customerName || "",
-        "Container Number": item.code || "",
-        "Container Condition": item.condition || "",
-        "Container Status": item.status || "",
-        "Employee/User Initials": item.initials || "",
-        "Notes": item.notes || "",
-        "Original Date/Time Entered": formatLocalTime(item.originalTimestamp || item.timestamp),
-        "Edited Date/Time": formatLocalTime(item.editedAt),
-        "Deleted Date/Time": formatLocalTime(item.deletedAt),
-        "Deleted By": item.deleteType || ""
-      }));
-    }
-
-    function activeCsvRows() {
-      return [
-        ["Session Name", sessionNameInput.value.trim()],
-        [],
-        ["Entry Number", "Customer Name", "Container Number", "Container Condition", "Container Status", "Employee/User Initials", "Notes", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"],
-        ...entries.map(item => [
-          item.sequence || "",
-          item.customerName || "",
-          item.code || "",
-          item.condition || "",
-          item.status || "",
-          item.initials || "",
-          item.notes || "",
-          formatLocalTime(item.timestamp),
-          formatLocalTime(item.editedAt),
-          formatLocalTime(item.restoredAt)
-        ])
-      ];
-    }
-
-    function deletedCsvRows() {
-      return [
-        ["Session Name", sessionNameInput.value.trim()],
-        [],
-        ["Entry Number", "Customer Name", "Container Number", "Container Condition", "Container Status", "Employee/User Initials", "Notes", "Original Date/Time Entered", "Edited Date/Time", "Deleted Date/Time", "Deleted By"],
-        ...deletedEntries.map(item => [
-          item.sequence || "",
-          item.customerName || "",
-          item.code || "",
-          item.condition || "",
-          item.status || "",
-          item.initials || "",
-          item.notes || "",
-          formatLocalTime(item.originalTimestamp || item.timestamp),
-          formatLocalTime(item.editedAt),
-          formatLocalTime(item.deletedAt),
-          item.deleteType || ""
-        ])
-      ];
-    }
-
-    function buildMasterCsv() {
-      const rows = [
-        ["Session Name", sessionNameInput.value.trim()],
-        ["Exported", formatLocalTime(new Date().toISOString())],
-        ["Active Entries", entries.length],
-        ["Deleted Entries", deletedEntries.length],
-        [],
-        ["ACTIVE ENTRIES"],
-        ...activeCsvRows().slice(2),
-        [],
-        ["DELETED ENTRIES"],
-        ...deletedCsvRows().slice(2)
-      ];
-
-      return rows.map(csvLine).join("\n");
-    }
-
-    function buildReportText() {
-      const badCount = entries.filter(item => item.condition === "Bad").length;
-      const flatCount = entries.filter(item => item.status === "Flat").length;
-      const builtCount = entries.filter(item => item.status === "Built").length;
-      const goodCount = entries.filter(item => item.condition === "Good").length;
-      const firstEntry = entries.length ? formatLocalTime(entries[0].timestamp) : "—";
-      const lastEntry = entries.length ? formatLocalTime(entries[entries.length - 1].timestamp) : "—";
-      const activeInitials = [...new Set(entries.map(item => item.initials).filter(Boolean))].join(", ") || "—";
-
-      return [
-        "ZIPPY SHELL INVENTORY FINAL REPORT",
-        "",
-        "Session: " + (sessionNameInput.value.trim() || "—"),
-        "Report Date: " + todayStamp(),
-        "Editing Status: " + (editLocked ? "Locked after final export" : "Unlocked"),
-        "",
-        "TOTALS",
-        "Active Entries: " + entries.length,
-        "Deleted Entries: " + deletedEntries.length,
-        "Duplicate Attempts Blocked: " + duplicateBlocks,
-        "Last Container Number: " + (entries.length ? entries[entries.length - 1].code : "—"),
-        "",
-        "CONDITION",
-        "Good: " + goodCount,
-        "Bad: " + badCount,
-        "",
-        "STATUS",
-        "Built: " + builtCount,
-        "Flat: " + flatCount,
-        "",
-        "TIMEFRAME",
-        "First Entry: " + firstEntry,
-        "Last Entry: " + lastEntry,
-        "Last Saved: " + formatLocalTime(lastSavedAt),
-        "",
-        "EMPLOYEE / USER INITIALS",
-        activeInitials,
-        "",
-        "NOTES",
-        "Review the Active Entries and Deleted Entries sheets for customer names and container-level notes."
-      ].join("\n");
-    }
-
-    function summaryArray() {
-      const rows = [
-        ["Session Name", sessionNameInput.value.trim()],
-        ["Export Date/Time", formatLocalTime(new Date().toISOString())],
-        ["Editing Status", editLocked ? "Locked" : "Unlocked"],
-        ["Active Entries", entries.length],
-        ["Deleted Entries", deletedEntries.length],
-        ["Duplicate Attempts Blocked", duplicateBlocks],
-        [],
-        ["By Condition", "Count"],
-        ["Good", entries.filter(item => item.condition === "Good").length],
-        ["Bad", entries.filter(item => item.condition === "Bad").length],
-        [],
-        ["By Status", "Count"],
-        ["Built", entries.filter(item => item.status === "Built").length],
-        ["Flat", entries.filter(item => item.status === "Flat").length]
-      ];
-
-      return rows;
-    }
-
-    function exportXlsx(finalLock) {
-      if (!entries.length && !deletedEntries.length) {
-        setStatus("No entries to export yet.", "warning");
-        input.focus();
-        return;
-      }
-
-      if (typeof XLSX === "undefined") {
-        setStatus("XLSX export library did not load. Check internet connection, then reopen the app. CSV/JSON backup still works.", "error");
-        return;
-      }
-
-      const wb = XLSX.utils.book_new();
-
-      const activeSheet = XLSX.utils.json_to_sheet(activeArray());
-      XLSX.utils.book_append_sheet(wb, activeSheet, "Active Entries");
-
-      const deletedSheet = XLSX.utils.json_to_sheet(deletedArray());
-      XLSX.utils.book_append_sheet(wb, deletedSheet, "Deleted Entries");
-
-      const summarySheet = XLSX.utils.aoa_to_sheet(summaryArray());
-      XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
-
-      const reportSheet = XLSX.utils.aoa_to_sheet(buildReportText().split("\n").map(line => [line]));
-      XLSX.utils.book_append_sheet(wb, reportSheet, "Final Report");
-
-      const filename = safeFilePart(sessionNameInput.value) + (finalLock ? "_FINAL_" : "_inventory_") + dateStamp() + ".xlsx";
-
-      if (finalLock) {
-        markFinalExportedAndLocked();
-      }
-
-      XLSX.writeFile(wb, filename);
-      saveEntries();
-      render();
-
-      setStatus(
-        finalLock
-          ? "Final XLSX exported and editing is now locked: " + filename + "."
-          : "XLSX exported: " + filename + ".",
-        "success"
-      );
-      input.focus();
-    }
-
-    function exportBackupJson() {
-      const backup = {
-        appName: "Zippy Shell Inventory App",
-        appVersion: 4,
-        exportedAt: new Date().toISOString(),
-        sessionName: sessionNameInput.value.trim(),
-        employeeInitials: employeeInitialsInput.value.trim(),
-        nextSequence,
-        duplicateBlocks,
-        editLocked,
-        finalExportSignature,
-        entries,
-        deletedEntries
-      };
-
-      const filename = safeFilePart(sessionNameInput.value) + "_backup_" + dateStamp() + ".json";
-      downloadBlob(JSON.stringify(backup, null, 2), filename, "application/json;charset=utf-8");
-      setStatus("Backup JSON exported: " + filename + ". This is the safest file to import later.", "success");
-      input.focus();
-    }
-
-    function exportCsvBackup() {
-      const filename = safeFilePart(sessionNameInput.value) + "_master_backup_" + dateStamp() + ".csv";
-      downloadBlob(buildMasterCsv(), filename, "text/csv;charset=utf-8");
-      setStatus("CSV backup exported: " + filename + ".", "success");
-      input.focus();
-    }
-
-    function exportDeletedCsv() {
-      if (!deletedEntries.length) {
-        setStatus("No deleted entries to export yet.", "warning");
-        input.focus();
-        return;
-      }
-
-      const filename = safeFilePart(sessionNameInput.value) + "_deleted_" + dateStamp() + ".csv";
-      downloadBlob(deletedCsvRows().map(csvLine).join("\n"), filename, "text/csv;charset=utf-8");
-      setStatus("Deleted entries CSV exported: " + filename + ".", "success");
-      input.focus();
-    }
-
-    async function copyText(text, successMessage) {
-      try {
-        await navigator.clipboard.writeText(text);
-        setStatus(successMessage, "success");
-      } catch {
-        const area = document.createElement("textarea");
-        area.value = text;
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand("copy");
-        area.remove();
-        setStatus(successMessage, "success");
-      }
-
-      input.focus();
-    }
-
-    function copyActiveList() {
-      if (!entries.length) {
-        setStatus("No active entries to copy yet.", "warning");
-        input.focus();
-        return;
-      }
-
-      const text = entries.map(item => [
-        item.sequence || "",
-        item.customerName || "",
-        item.code || "",
-        item.condition || "",
-        item.status || "",
-        item.initials || "",
-        item.notes || ""
-      ].join("\t")).join("\n");
-
-      copyText(text, "Active container list copied.");
-    }
-
-    function copyDeletedList() {
-      if (!deletedEntries.length) {
-        setStatus("No deleted entries to copy yet.", "warning");
-        input.focus();
-        return;
-      }
-
-      const text = deletedEntries.map(item => [
-        item.sequence || "",
-        item.customerName || "",
-        item.code || "",
-        item.condition || "",
-        item.status || "",
-        item.initials || "",
-        item.notes || "",
-        item.deleteType || "",
-        formatLocalTime(item.deletedAt)
-      ].join("\t")).join("\n");
-
-      copyText(text, "Deleted entries copied.");
-    }
-
-    function copyReport() {
-      copyText(buildReportText(), "Final report copied.");
-    }
-
-    function downloadReport() {
-      const filename = safeFilePart(sessionNameInput.value) + "_final_report_" + dateStamp() + ".txt";
-      downloadBlob(buildReportText(), filename, "text/plain;charset=utf-8");
-      setStatus("Final report downloaded: " + filename + ".", "success");
-    }
-
-    function readFileAsText(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsText(file);
-      });
-    }
-
-    function readFileAsArrayBuffer(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsArrayBuffer(file);
-      });
-    }
-
-    function rowsToObjects(rows) {
-      if (!rows.length) return [];
-      const headers = rows[0].map(h => String(h || "").trim());
-      return rows.slice(1).filter(row => row.some(cell => String(cell || "").trim() !== "")).map(row => {
-        const obj = {};
-        headers.forEach((header, index) => {
-          obj[header] = row[index] || "";
-        });
-        return obj;
-      });
-    }
-
-    function dataFromJsonBackup(data) {
-      if (!Array.isArray(data.entries) && !Array.isArray(data.deletedEntries)) {
-        throw new Error("JSON backup does not contain entries.");
-      }
-
-      return {
-        sessionName: data.sessionName || defaultSessionName(),
-        employeeInitials: data.employeeInitials || "",
-        nextSequence: Number(data.nextSequence) || 1,
-        duplicateBlocks: Number(data.duplicateBlocks) || 0,
-        editLocked: Boolean(data.editLocked),
-        finalExportSignature: data.finalExportSignature || "",
-        entries: (data.entries || []).map((item, index) => normalizeEntry(item, index + 1)).filter(item => item.code),
-        deletedEntries: (data.deletedEntries || []).map((item, index) => normalizeDeleted(item, index + 1)).filter(item => item.code)
-      };
-    }
-
-    function findSectionRows(rows, sectionName) {
-      const sectionIndex = rows.findIndex(row => String(row[0] || "").trim().toUpperCase() === sectionName);
-      if (sectionIndex === -1) return [];
-
-      const headerIndex = sectionIndex + 1;
-      const headers = rows[headerIndex] || [];
-      const output = [headers];
-
-      for (let i = headerIndex + 1; i < rows.length; i++) {
-        const firstCell = String(rows[i][0] || "").trim().toUpperCase();
-        if (firstCell === "ACTIVE ENTRIES" || firstCell === "DELETED ENTRIES") break;
-        if (rows[i].some(cell => String(cell || "").trim() !== "")) output.push(rows[i]);
-      }
-
-      return output;
-    }
-
-    function dataFromCsvRows(rows) {
-      let activeSection = findSectionRows(rows, "ACTIVE ENTRIES");
-      let deletedSection = findSectionRows(rows, "DELETED ENTRIES");
-
-      if (!activeSection.length) {
-        const headerIndex = rows.findIndex(row => row.map(cell => String(cell).trim()).includes("Container Number"));
-        if (headerIndex !== -1) activeSection = rows.slice(headerIndex);
-      }
-
-      const activeObjects = rowsToObjects(activeSection);
-      const deletedObjects = rowsToObjects(deletedSection);
-
-      if (!activeObjects.length && !deletedObjects.length) {
-        throw new Error("No importable entries found in the CSV file.");
-      }
-
-      const importedEntries = activeObjects.map((item, index) => normalizeEntry(item, index + 1)).filter(item => item.code);
-      const importedDeleted = deletedObjects.map((item, index) => normalizeDeleted(item, importedEntries.length + index + 1)).filter(item => item.code);
-
-      return {
-        sessionName: sessionNameInput.value.trim() || defaultSessionName(),
-        employeeInitials: employeeInitialsInput.value.trim(),
-        nextSequence: 1,
-        duplicateBlocks: duplicateBlocks,
-        editLocked: false,
-        finalExportSignature: "",
-        entries: importedEntries,
-        deletedEntries: importedDeleted
-      };
-    }
-
-    function dataFromWorkbook(workbook) {
-      const activeSheet = workbook.Sheets["Active Entries"] || workbook.Sheets[workbook.SheetNames[0]];
-      const deletedSheet = workbook.Sheets["Deleted Entries"];
-      const activeObjects = activeSheet ? XLSX.utils.sheet_to_json(activeSheet, { defval: "" }) : [];
-      const deletedObjects = deletedSheet ? XLSX.utils.sheet_to_json(deletedSheet, { defval: "" }) : [];
-
-      if (!activeObjects.length && !deletedObjects.length) {
-        throw new Error("No importable entries found in the XLSX file.");
-      }
-
-      const importedEntries = activeObjects.map((item, index) => normalizeEntry(item, index + 1)).filter(item => item.code);
-      const importedDeleted = deletedObjects.map((item, index) => normalizeDeleted(item, importedEntries.length + index + 1)).filter(item => item.code);
-
-      return {
-        sessionName: sessionNameInput.value.trim() || defaultSessionName(),
-        employeeInitials: employeeInitialsInput.value.trim(),
-        nextSequence: 1,
-        duplicateBlocks: duplicateBlocks,
-        editLocked: false,
-        finalExportSignature: "",
-        entries: importedEntries,
-        deletedEntries: importedDeleted
-      };
-    }
-
-    function applyImportedData(data) {
-      entries = data.entries || [];
-      deletedEntries = data.deletedEntries || [];
-
-      const highest = Math.max(
-        0,
-        ...entries.map(item => Number(item.sequence) || 0),
-        ...deletedEntries.map(item => Number(item.sequence) || 0)
-      );
-
-      nextSequence = Math.max(Number(data.nextSequence) || 1, highest + 1);
-      duplicateBlocks = Number(data.duplicateBlocks) || 0;
-      editLocked = Boolean(data.editLocked);
-      finalExportSignature = data.finalExportSignature || "";
-
-      sessionNameInput.value = data.sessionName || defaultSessionName();
-      employeeInitialsInput.value = data.employeeInitials || "";
-
-      if (finalExportSignature) {
-        localStorage.setItem(FINAL_EXPORT_SIGNATURE_KEY, finalExportSignature);
-      } else {
-        localStorage.removeItem(FINAL_EXPORT_SIGNATURE_KEY);
-      }
-
-      saveEntries();
-      render();
-    }
-
-    async function importBackup() {
-      if (requireUnlocked("import a backup")) return;
-
-      const file = backupFileInput.files && backupFileInput.files[0];
-      if (!file) {
-        setStatus("Choose a backup file first.", "warning");
-        backupFileInput.focus();
-        return;
-      }
-
-      const ok = confirm("Importing this backup will replace the current active and deleted lists. Continue?");
-      if (!ok) return;
-
-      try {
-        const name = file.name.toLowerCase();
-        let imported;
-
-        if (name.endsWith(".json")) {
-          const text = await readFileAsText(file);
-          imported = dataFromJsonBackup(JSON.parse(text));
-        } else if (name.endsWith(".csv")) {
-          const text = await readFileAsText(file);
-          imported = dataFromCsvRows(parseCsv(text));
-        } else if (name.endsWith(".xlsx")) {
-          if (typeof XLSX === "undefined") {
-            throw new Error("XLSX library is not loaded. Try JSON or CSV import instead.");
-          }
-          const buffer = await readFileAsArrayBuffer(file);
-          const workbook = XLSX.read(buffer, { type: "array" });
-          imported = dataFromWorkbook(workbook);
-        } else {
-          throw new Error("Unsupported backup file type.");
-        }
-
-        applyImportedData(imported);
-        backupFileInput.value = "";
-        setStatus("Backup imported successfully. Review the active and deleted lists before continuing.", "success");
-        input.focus();
-      } catch (error) {
-        setStatus("Import failed: " + error.message, "error");
+        lockBadge.textContent = 'Editing Unlocked';
+        lockBadge.classList.remove('locked');
+        lockBadge.classList.add('unlocked');
+        localStorage.setItem(EDIT_LOCKED_KEY, 'false');
       }
     }
 
-    function summaryCounts(field, orderedValues) {
-      const counts = {};
-      orderedValues.forEach(value => counts[value] = 0);
-      entries.forEach(item => {
-        const value = item[field] || "";
-        counts[value] = (counts[value] || 0) + 1;
-      });
-      return counts;
+    function formatEntry(e) {
+      return `${String(e.seq).padStart(3, '0')} ${e.code} ${e.customer ? '— ' + e.customer : ''}`;
     }
 
-    function initialsCounts() {
-      const counts = {};
-      entries.forEach(item => {
-        const key = item.initials || "Blank";
-        counts[key] = (counts[key] || 0) + 1;
-      });
-      return counts;
-    }
-
-    function renderSummaryBox(container, counts, orderedValues) {
-      container.innerHTML = "";
-
-      orderedValues.forEach(value => {
-        const line = document.createElement("div");
-        line.className = "summary-line";
-
-        const label = document.createElement("span");
-        label.textContent = value;
-
-        const number = document.createElement("strong");
-        number.textContent = counts[value] || 0;
-
-        line.appendChild(label);
-        line.appendChild(number);
-        container.appendChild(line);
-      });
-    }
-
-    function renderSummaries() {
-      renderSummaryBox(conditionSummary, summaryCounts("condition", ["Good", "Bad"]), ["Good", "Bad"]);
-      renderSummaryBox(statusSummary, summaryCounts("status", ["Built", "Flat"]), ["Built", "Flat"]);
-
-      const counts = initialsCounts();
-      const keys = Object.keys(counts).sort();
-      renderSummaryBox(initialsSummary, counts, keys.length ? keys : ["Blank"]);
-    }
-
-    function entryMatchesSearch(item, query) {
-      if (!query) return true;
-
-      const text = [
-        item.sequence,
-        "#" + item.sequence,
-        item.code,
-        item.customerName,
-        item.condition,
-        item.status,
-        item.initials,
-        item.notes
-      ].join(" ").toUpperCase();
-
-      return text.includes(query);
-    }
-
-    function renderActiveEntries() {
-      const query = normalizeSearch(searchInput.value);
-      const filtered = entries.filter(item => entryMatchesSearch(item, query));
-      searchCountText.textContent = query
-        ? "Showing " + filtered.length + " of " + entries.length
-        : "Showing all";
-
-      if (!entries.length) {
-        list.innerHTML = '<div class="empty">No containers entered yet.</div>';
-        return;
-      }
-
-      if (!filtered.length) {
-        list.innerHTML = '<div class="empty">No matching active entries.</div>';
-        return;
-      }
-
-      list.innerHTML = "";
-      filtered.slice().reverse().forEach(item => {
-        const row = document.createElement("div");
-        row.className = "row";
-
-        const num = document.createElement("div");
-        num.className = "num";
-        num.textContent = "#" + (item.sequence || "—");
-
-        const info = document.createElement("div");
-
-        const code = document.createElement("div");
-        code.className = "code";
-        code.textContent = item.code;
-
-        const details = document.createElement("div");
-        details.className = "details";
-
-        [
-          item.customerName ? "Customer: " + item.customerName : "No Customer Name",
-          item.condition || "Good",
-          item.status || "Built",
-          item.initials ? "By " + item.initials : "",
-          item.editedAt ? "Edited " + formatShortTime(item.editedAt) : "",
-          item.restoredAt ? "Restored " + formatShortTime(item.restoredAt) : ""
-        ].filter(Boolean).forEach(value => {
-          const tag = document.createElement("span");
-          tag.className = "tag";
-          tag.textContent = value;
-          details.appendChild(tag);
-        });
-
-        info.appendChild(code);
-        info.appendChild(details);
-
-        if (item.notes) {
-          const note = document.createElement("div");
-          note.className = "note-preview";
-          note.textContent = "Notes: " + item.notes;
-          info.appendChild(note);
-        }
-
-        const rowActions = document.createElement("div");
-        rowActions.className = "row-actions";
-
-        const edit = document.createElement("button");
-        edit.type = "button";
-        edit.textContent = "Edit";
-        edit.disabled = editLocked;
-        edit.addEventListener("click", () => startEdit(item.sequence));
-
-        const del = document.createElement("button");
-        del.type = "button";
-        del.className = "danger";
-        del.textContent = "Delete";
-        del.disabled = editLocked;
-        del.addEventListener("click", () => deleteEntry(item.sequence));
-
-        rowActions.appendChild(edit);
-        rowActions.appendChild(del);
-
-        row.appendChild(num);
-        row.appendChild(info);
-        row.appendChild(rowActions);
-        list.appendChild(row);
-      });
-    }
-
-    function renderDeletedEntries() {
-      deletedCountText.textContent = deletedEntries.length + " deleted";
-
-      if (!deletedEntries.length) {
-        deletedList.innerHTML = '<div class="empty">No deleted entries yet.</div>';
-        return;
-      }
-
-      deletedList.innerHTML = "";
-
-      deletedEntries.slice().reverse().forEach(item => {
-        const row = document.createElement("div");
-        row.className = "row";
-
-        const num = document.createElement("div");
-        num.className = "num";
-        num.textContent = "#" + (item.sequence || "—");
-
-        const info = document.createElement("div");
-
-        const code = document.createElement("div");
-        code.className = "code";
-        code.textContent = item.code || "—";
-
-        const details = document.createElement("div");
-        details.className = "details";
-
-        [
-          item.customerName ? "Customer: " + item.customerName : "No Customer Name",
-          item.condition || "",
-          item.status || "",
-          item.initials ? "By " + item.initials : "",
-          item.deleteType || "",
-          item.deletedAt ? "Deleted " + formatShortTime(item.deletedAt) : ""
-        ].filter(Boolean).forEach(value => {
-          const tag = document.createElement("span");
-          tag.className = "tag";
-          tag.textContent = value;
-          details.appendChild(tag);
-        });
-
-        info.appendChild(code);
-        info.appendChild(details);
-
-        if (item.notes) {
-          const note = document.createElement("div");
-          note.className = "note-preview";
-          note.textContent = "Notes: " + item.notes;
-          info.appendChild(note);
-        }
-
-        const rowActions = document.createElement("div");
-        rowActions.className = "row-actions";
-
-        const restore = document.createElement("button");
-        restore.type = "button";
-        restore.className = "success-solid";
-        restore.textContent = "Restore";
-        restore.disabled = editLocked;
-        restore.addEventListener("click", () => restoreDeletedEntry(item.sequence));
-
-        rowActions.appendChild(restore);
-
-        row.appendChild(num);
-        row.appendChild(info);
-        row.appendChild(rowActions);
-        deletedList.appendChild(row);
-      });
-    }
-
-    function renderLockState() {
-      lockBadge.textContent = editLocked ? "Editing Locked" : "Editing Unlocked";
-      lockBadge.className = "badge " + (editLocked ? "locked" : "unlocked");
-
-      const xlsxReady = typeof XLSX !== "undefined";
-      xlsxBadge.textContent = xlsxReady ? "XLSX Ready" : "XLSX Not Loaded";
-      xlsxBadge.className = "badge" + (xlsxReady ? " unlocked" : " locked");
-
-      addBtn.disabled = editLocked;
-      undoBtn.disabled = editLocked;
-      importBackupBtn.disabled = editLocked;
-      saveEditBtn.disabled = editLocked;
-
-      unlockBtn.textContent = editLocked ? "Unlock Editing" : "Editing Unlocked";
-      finishClearBtn.disabled = !(hasFreshFinalExport() && editLocked);
-    }
-
-    function renderReport() {
-      const report = buildReportText();
-      finalReport.textContent = report;
-      reportUpdatedText.textContent = "Updated " + formatShortTime(new Date().toISOString());
-    }
-
-    function render() {
-      count.textContent = entries.length;
-      deletedMetric.textContent = deletedEntries.length;
-      lastEntryMetric.textContent = entries.length ? entries[entries.length - 1].code : "—";
-      lastSaved.textContent = formatShortTime(lastSavedAt);
-
-      renderSummaries();
-      renderActiveEntries();
-      renderDeletedEntries();
-      renderReport();
-      renderLockState();
-
-      entryModeBtn.textContent = document.body.classList.contains("entry-mode")
-        ? "Exit Big Entry Mode"
-        : "Big Entry Mode";
-
-      if (toggleImportBtn && importPanel) {
-        toggleImportBtn.textContent = importPanel.hidden ? "Import / Restore" : "Close Import";
-      }
-    }
-
-    function toggleImportPanel() {
-      importPanel.hidden = !importPanel.hidden;
-      toggleImportBtn.textContent = importPanel.hidden ? "Import / Restore" : "Close Import";
-      if (!importPanel.hidden) {
-        backupFileInput.focus();
-      } else {
-        input.focus();
-      }
-    }
-
-    function toggleEntryMode() {
-      document.body.classList.toggle("entry-mode");
-      if (document.body.classList.contains("entry-mode")) {
-        notesInput.value = "";
-        importPanel.hidden = true;
-        toggleImportBtn.textContent = "Import / Restore";
-      }
-      localStorage.setItem(ENTRY_MODE_KEY, document.body.classList.contains("entry-mode") ? "true" : "false");
-      render();
-      input.focus();
-    }
-
-    input.addEventListener("input", () => {
-      input.value = normalizeCode(input.value);
-    });
-
-    editCode.addEventListener("input", () => {
-      editCode.value = normalizeCode(editCode.value);
-    });
-
-    employeeInitialsInput.addEventListener("input", () => {
-      employeeInitialsInput.value = normalizeInitials(employeeInitialsInput.value);
-      localStorage.setItem(INITIALS_KEY, employeeInitialsInput.value);
-    });
-
-    editInitials.addEventListener("input", () => {
-      editInitials.value = normalizeInitials(editInitials.value);
-    });
-
-    input.addEventListener("keydown", event => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        addEntry();
-      }
-    });
-
-    customerNameInput.addEventListener("keydown", event => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        input.focus();
-      }
-    });
-
-    editCode.addEventListener("keydown", event => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        saveEdit();
-      }
-    });
-
-    finishConfirm.addEventListener("keydown", event => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        clearFinishedList();
-      }
-    });
-
-    sessionNameInput.addEventListener("input", () => {
-      localStorage.setItem(SESSION_KEY, sessionNameInput.value.trim());
-      render();
-    });
-
-
-    searchInput.addEventListener("input", renderActiveEntries);
-
-    addBtn.addEventListener("click", addEntry);
-    exportXlsxBtn.addEventListener("click", () => exportXlsx(false));
-    finalExportBtn.addEventListener("click", () => exportXlsx(true));
-    undoBtn.addEventListener("click", undoLast);
-    copyBtn.addEventListener("click", copyActiveList);
-    backupJsonBtn.addEventListener("click", exportBackupJson);
-    unlockBtn.addEventListener("click", unlockEditing);
-    focusEntryBtn.addEventListener("click", () => input.focus());
-    exportCsvBtn.addEventListener("click", exportCsvBackup);
-    toggleImportBtn.addEventListener("click", toggleImportPanel);
-    entryModeBtn.addEventListener("click", toggleEntryMode);
-    importBackupBtn.addEventListener("click", importBackup);
-    clearFileBtn.addEventListener("click", () => { backupFileInput.value = ""; setStatus("Selected backup file cleared.", "info"); });
-    finishClearBtn.addEventListener("click", clearFinishedList);
-    exportDeletedCsvBtn.addEventListener("click", exportDeletedCsv);
-    copyDeletedBtn.addEventListener("click", copyDeletedList);
-    saveEditBtn.addEventListener("click", saveEdit);
-    cancelEditBtn.addEventListener("click", cancelEdit);
-    copyReportBtn.addEventListener("click", copyReport);
-    downloadReportBtn.addEventListener("click", downloadReport);
-
-    setTimeout(render, 500);
-    render();
-    input.focus();
-  </script>
-</body>
-</html>
+    function renderList() {
+      listEl.innerHTML = '';
+      const query = searchInput.value.trim().toLowerCase();
+      const filtered = entries.filter(e => {
+        if (!query) return true;
+        return (
+          e.code.toLowerCase().includes(query) ||
+          String(e.seq).includes(query) ||
+          (e.customer && e.customer.toLowerCase().includes(query)) ||
+          (e.notes && e.notes.toLowerCase().includes(query)) ||
+          (e.initials && e.initials.toLowerCase().includes(query)) ||
+          (e.condition && e.condition.toLowerCase().includes(query)) ||
+... (truncated for brevity) ...
