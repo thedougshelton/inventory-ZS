@@ -1961,10 +1961,18 @@
       });
     }
 
+    function isEntryHeaderRow(row) {
+      const headers = row.map(cell => String(cell || "").trim());
+      return headers.includes("Container Number") && headers.includes("Entry Number");
+    }
+
     function rowsToObjects(rows) {
       if (!rows.length) return [];
-      const headers = rows[0].map(h => String(h || "").trim());
-      return rows.slice(1).filter(row => row.some(cell => String(cell || "").trim() !== "")).map(row => {
+      const headerIndex = rows.findIndex(isEntryHeaderRow);
+      if (headerIndex === -1) return [];
+
+      const headers = rows[headerIndex].map(h => String(h || "").trim());
+      return rows.slice(headerIndex + 1).filter(row => row.some(cell => String(cell || "").trim() !== "")).map(row => {
         const obj = {};
         headers.forEach((header, index) => {
           obj[header] = row[index] || "";
@@ -2012,7 +2020,7 @@
       let deletedSection = findSectionRows(rows, "DELETED ENTRIES");
 
       if (!activeSection.length) {
-        const headerIndex = rows.findIndex(row => row.map(cell => String(cell).trim()).includes("Container Number"));
+        const headerIndex = rows.findIndex(isEntryHeaderRow);
         if (headerIndex !== -1) activeSection = rows.slice(headerIndex);
       }
 
