@@ -1275,7 +1275,7 @@
         <div class="value" id="deletedMetric">0</div>
       </div>
       <div class="metric">
-        <div class="label">Last Container Number</div>
+        <div class="label">Last Container/Item Number</div>
         <div class="value" id="lastEntryMetric">-</div>
       </div>
       <div class="metric">
@@ -1326,7 +1326,7 @@
 
     <section class="card entry-card">
       <div class="field-group">
-        <label for="containerSize">Container size</label>
+        <label for="containerSize">Container/Item size</label>
         <select id="containerSize">
           <option value="ZM" selected>ZM</option>
           <option value="Pallet">Pallet</option>
@@ -1339,8 +1339,8 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">Container Condition</div>
-        <div class="option-grid" role="radiogroup" aria-label="Container Condition">
+        <div class="field-label">Container/Item Condition</div>
+        <div class="option-grid" role="radiogroup" aria-label="Container/Item Condition">
           <label class="option-pill">
             <input type="radio" name="containerCondition" value="Good" checked />
             Good
@@ -1353,8 +1353,8 @@
       </div>
 
       <div class="field-group">
-        <div class="field-label">Container Status</div>
-        <div class="option-grid" role="radiogroup" aria-label="Container Status">
+        <div class="field-label">Container/Item Status</div>
+        <div class="option-grid" role="radiogroup" aria-label="Container/Item Status">
           <label class="option-pill">
             <input type="radio" name="containerStatus" value="Built" checked />
             Built
@@ -1371,7 +1371,7 @@
         <textarea id="notesInput" autocomplete="off" placeholder="OPTIONAL NOTES, DAMAGE COMMENTS, MISSING LABEL, ETC."></textarea>
       </div>
 
-      <label for="containerInput">Container number</label>
+      <label for="containerInput">Container/Item number</label>
       <div class="entry-row">
         <input
           id="containerInput"
@@ -1388,7 +1388,7 @@
       </div>
       <div id="status" class="status" role="status" aria-live="polite">Ready for first container.</div>
       <button id="toggleContainerKeyboardBtn" class="keyboard-toggle" type="button" aria-expanded="false" aria-controls="containerKeyboard">Show Keyboard</button>
-      <div id="containerKeyboard" class="container-keyboard" aria-label="Container number keyboard" hidden></div>
+      <div id="containerKeyboard" class="container-keyboard" aria-label="Container/Item number keyboard" hidden></div>
       <div class="unit-photo-panel">
         <button id="takeUnitPhotoBtn" type="button">Take Compressed Photo For Last Entry</button>
         <input id="unitPhotoInput" type="file" accept="image/*" capture="environment" hidden />
@@ -1452,11 +1452,11 @@
         <h3 id="editTitle">Edit Entry</h3>
         <div class="edit-grid">
           <div class="full">
-            <label for="editCode">Container number</label>
+            <label for="editCode">Container/Item number</label>
             <input id="editCode" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" />
           </div>
           <div>
-            <label for="editSize">Container size</label>
+            <label for="editSize">Container/Item size</label>
             <select id="editSize">
               <option value="ZM">ZM</option>
               <option value="Pallet">Pallet</option>
@@ -1468,14 +1468,14 @@
             </select>
           </div>
           <div>
-            <label for="editCondition">Container Condition</label>
+            <label for="editCondition">Container/Item Condition</label>
             <select id="editCondition">
               <option value="Good">Good</option>
               <option value="Bad">Bad</option>
             </select>
           </div>
           <div>
-            <label for="editStatus">Container Status</label>
+            <label for="editStatus">Container/Item Status</label>
             <select id="editStatus">
               <option value="Built">Built</option>
               <option value="Flat">Flat</option>
@@ -1901,10 +1901,10 @@
 
       return {
         sequence,
-        code: normalizeCode(item.code || item["Container Number"] || item.containerNumber || ""),
-        size: normalizeContainerSize(item.size || item["Container Size"] || item.containerSize || DEFAULT_CONTAINER_SIZE),
-        condition: item.condition || item["Container Condition"] || item.containerCondition || "Good",
-        status: item.status || item["Container Status"] || item.containerStatus || "Built",
+        code: normalizeCode(item.code || item["Container/Item Number"] || item["Container Number"] || item.containerNumber || ""),
+        size: normalizeContainerSize(item.size || item["Container/Item Size"] || item["Container Size"] || item.containerSize || DEFAULT_CONTAINER_SIZE),
+        condition: item.condition || item["Container/Item Condition"] || item["Container Condition"] || item.containerCondition || "Good",
+        status: item.status || item["Container/Item Status"] || item["Container Status"] || item.containerStatus || "Built",
         initials: normalizeInitials(item.initials || item["Employee/User Initials"] || item["Initials"] || ""),
         notes: normalizeUpperText(item.notes || item["Notes"] || ""),
         timestamp: item.timestamp || item["Date/Time Entered"] || item.dateTimeEntered || new Date().toISOString(),
@@ -1976,8 +1976,8 @@
       const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
       let items = rawItems.map(item => ({
         code: normalizeCode(item.code || item.unitName || item["UnitName"] || ""),
-        type: normalizeOccupiedTypeSize(item.type || item["Type"] || item["Container Size"] || item["Unit Size"] || item["Size"] || "", item.code || item.unitName || item["UnitName"] || ""),
-        rawType: normalizeUpperText(item.rawType || item["Raw Type"] || item.type || item["Type"] || item["Container Size"] || item["Unit Size"] || item["Size"] || "")
+        type: normalizeOccupiedTypeSize(item.type || item["Type"] || item["Container/Item Size"] || item["Container Size"] || item["Unit Size"] || item["Size"] || "", item.code || item.unitName || item["UnitName"] || ""),
+        rawType: normalizeUpperText(item.rawType || item["Raw Type"] || item.type || item["Type"] || item["Container/Item Size"] || item["Container Size"] || item["Unit Size"] || item["Size"] || "")
       })).filter(item => isUploadedInventoryCode(item.code));
 
       if (!items.length && Array.isArray(parsed.codes)) {
@@ -2412,29 +2412,29 @@
       const notes = document.body.classList.contains("entry-mode") ? "" : normalizeUpperText(notesInput.value.trim());
 
       if (!size) {
-        setStatus("Select a container size first.", "warning");
+        setStatus("Select a container/item size first.", "warning");
         sizeSelect.focus();
         return;
       }
 
       if (!condition) {
-        setStatus("Select a container condition first.", "warning");
+        setStatus("Select a container/item condition first.", "warning");
         return;
       }
 
       if (!containerStatus) {
-        setStatus("Select a container status first.", "warning");
+        setStatus("Select a container/item status first.", "warning");
         return;
       }
 
       if (!code) {
-        setStatus("Type a container number first.", "warning");
+        setStatus("Type a container/item number first.", "warning");
         input.focus();
         return;
       }
 
       if (!isValid(code)) {
-        setStatus("Invalid entry. Container number must be exactly 6 letters/numbers.", "error");
+        setStatus("Invalid entry. Container/item number must be exactly 6 letters/numbers.", "error");
         input.select();
         return;
       }
@@ -2696,7 +2696,7 @@
 
       const code = normalizeCode(editCode.value);
       if (!isValid(code)) {
-        setStatus("Edit not saved. Container number must be exactly 6 letters/numbers.", "error");
+        setStatus("Edit not saved. Container/item number must be exactly 6 letters/numbers.", "error");
         editCode.select();
         return;
       }
@@ -2931,7 +2931,7 @@
     function styleActiveRowsByCondition(ws, activeRows) {
       const columnCount = Object.keys(activeRows[0] || {}).length;
       activeRows.forEach((row, index) => {
-        styleWorksheetRow(ws, index + 2, columnCount, conditionCellStyle(row["Container Condition"]));
+        styleWorksheetRow(ws, index + 2, columnCount, conditionCellStyle(row["Container/Item Condition"] || row["Container Condition"]));
       });
     }
 
@@ -2978,7 +2978,7 @@
     function expectedUnitsRows() {
       const activeMap = activeEntryByCode();
       return [
-        ["UNIT NUMBER", "UPLOADED UNIT SIZE", "PHYSICALLY FOUND", "CONTAINER CONDITION", "ENTERED UNIT SIZE", "SIZE CHECK"],
+        ["UNIT NUMBER", "UPLOADED UNIT SIZE", "PHYSICALLY FOUND", "CONTAINER/ITEM CONDITION", "ENTERED UNIT SIZE", "SIZE CHECK"],
         ...occupiedExpectedItems().map(item => {
           const activeItem = activeMap.get(item.code);
           const found = Boolean(activeItem);
@@ -3024,7 +3024,7 @@
     function mismatchSheetRows() {
       const activeMap = activeEntryByCode();
       return [
-        ["UNIT NUMBER", "EXPECTED SIZE", "ENTERED SIZE", "CONTAINER CONDITION", "CONTAINER STATUS", "EMPLOYEE/USER INITIALS", "DATE/TIME ENTERED"],
+        ["UNIT NUMBER", "EXPECTED SIZE", "ENTERED SIZE", "CONTAINER/ITEM CONDITION", "CONTAINER/ITEM STATUS", "EMPLOYEE/USER INITIALS", "DATE/TIME ENTERED"],
         ...occupiedComparison().sizeMismatches.map(item => {
           const activeItem = activeMap.get(item.code) || {};
           return [
@@ -3072,10 +3072,10 @@
     function activeArray() {
       return entries.map(item => ({
         "Entry Number": item.sequence || "",
-        "Container Number": item.code || "",
-        "Container Size": item.size || "",
-        "Container Condition": item.condition || "",
-        "Container Status": item.status || "",
+        "Container/Item Number": item.code || "",
+        "Container/Item Size": item.size || "",
+        "Container/Item Condition": item.condition || "",
+        "Container/Item Status": item.status || "",
         "Employee/User Initials": item.initials || "",
         "Notes": item.notes || "",
         "Photo Attached": item.photoDataUrl ? "YES" : "",
@@ -3090,10 +3090,10 @@
     function deletedArray() {
       return deletedEntries.map(item => ({
         "Entry Number": item.sequence || "",
-        "Container Number": item.code || "",
-        "Container Size": item.size || "",
-        "Container Condition": item.condition || "",
-        "Container Status": item.status || "",
+        "Container/Item Number": item.code || "",
+        "Container/Item Size": item.size || "",
+        "Container/Item Condition": item.condition || "",
+        "Container/Item Status": item.status || "",
         "Employee/User Initials": item.initials || "",
         "Notes": item.notes || "",
         "Photo Attached": item.photoDataUrl ? "YES" : "",
@@ -3125,14 +3125,14 @@
         [
           "Audit Status",
           "Unit Number",
-          "Container Size",
+          "Container/Item Size",
           "Uploaded Unit Size",
           "Physically Found",
           "Scanned Entry Number",
           "Scanned Unit Size",
           "Size Check",
-          "Container Condition",
-          "Container Status",
+          "Container/Item Condition",
+          "Container/Item Status",
           "Employee/User Initials",
           "Notes",
           "Photo Attached",
@@ -3217,7 +3217,7 @@
 
     function pictureRows() {
       const rows = [
-        ["Photo Preview", "Entry Number", "Container Number", "List", "Container Size", "Container Condition", "Container Status", "Photo Date/Time", "Compressed Photo Size KB", "Thumbnail Size KB", "Notes"]
+        ["Photo Preview", "Entry Number", "Container/Item Number", "List", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Photo Date/Time", "Compressed Photo Size KB", "Thumbnail Size KB", "Notes"]
       ];
 
       [
@@ -3289,7 +3289,7 @@
 
     function activeCsvRows() {
       return [
-        ["Entry Number", "Container Number", "Container Size", "Container Condition", "Container Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"],
+        ["Entry Number", "Container/Item Number", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"],
         ...entries.map(item => [
           item.sequence || "",
           item.code || "",
@@ -3309,7 +3309,7 @@
 
     function deletedCsvRows() {
       return [
-        ["Entry Number", "Container Number", "Container Size", "Container Condition", "Container Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Original Date/Time Entered", "Edited Date/Time", "Deleted Date/Time", "Deleted By"],
+        ["Entry Number", "Container/Item Number", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Original Date/Time Entered", "Edited Date/Time", "Deleted Date/Time", "Deleted By"],
         ...deletedEntries.map(item => [
           item.sequence || "",
           item.code || "",
@@ -3439,7 +3439,7 @@
       const comparison = occupiedComparison();
       const activeMap = activeEntryByCode();
       const rows = [
-        ["Entry Number", "Container Number", "Container Size", "Container Condition", "Container Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"]
+        ["Entry Number", "Container/Item Number", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"]
       ];
       comparison.extraFound.forEach(code => {
         const item = activeMap.get(code) || {};
@@ -3466,7 +3466,7 @@
       const comparison = occupiedComparison();
       const activeMap = activeEntryByCode();
       const rows = [
-        ["Unit Number", "Uploaded Unit Size", "Scanned Entry Number", "Scanned Unit Size", "Size Check", "Container Condition", "Container Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"]
+        ["Unit Number", "Uploaded Unit Size", "Scanned Entry Number", "Scanned Unit Size", "Size Check", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"]
       ];
       comparison.foundExpected.forEach(code => {
         const expectedItem = comparison.itemByCode.get(code) || {};
@@ -3769,7 +3769,7 @@
     function isTypeHeader(value) {
       const header = cleanHeader(value);
       const compact = compactHeader(value);
-      return ["TYPE", "UNIT TYPE", "CONTAINER TYPE", "CONTAINER SIZE", "UNIT SIZE", "SIZE"].includes(header) || ["TYPE", "UNITTYPE", "CONTAINERTYPE", "CONTAINERSIZE", "UNITSIZE", "SIZE"].includes(compact);
+      return ["TYPE", "UNIT TYPE", "CONTAINER TYPE", "CONTAINER SIZE", "CONTAINER/ITEM SIZE", "UNIT SIZE", "SIZE"].includes(header) || ["TYPE", "UNITTYPE", "CONTAINERTYPE", "CONTAINERSIZE", "CONTAINERITEMSIZE", "UNITSIZE", "SIZE"].includes(compact);
     }
 
     function findOccupiedHeaderColumns(rows) {
@@ -3797,6 +3797,7 @@
         "UNIT NAME",
         "UNIT NUMBER",
         "CONTAINER NUMBER",
+        "CONTAINER/ITEM NUMBER",
         "CONTAINER",
         "EQUIPMENT NUMBER",
         "ASSET NUMBER",
@@ -3941,15 +3942,15 @@
         ["SIZE MISMATCHES", comparison.sizeMismatches.length],
         [],
         ["SCANNED UNIT MATCH INVENTORY"],
-        ["UNIT NUMBER", "CONTAINER SIZE"],
+        ["UNIT NUMBER", "CONTAINER/ITEM SIZE"],
         ...auditRowsForCodes(comparison.foundExpected, comparison),
         [],
         ["ON INVENTORY NOT SCANNED"],
-        ["UNIT NUMBER", "CONTAINER SIZE"],
+        ["UNIT NUMBER", "CONTAINER/ITEM SIZE"],
         ...auditRowsForCodes(comparison.missingExpected, comparison),
         [],
         ["SCANNED BUT NOT ON INVENTORY"],
-        ["UNIT NUMBER", "CONTAINER SIZE"],
+        ["UNIT NUMBER", "CONTAINER/ITEM SIZE"],
         ...comparison.extraFound.map(code => {
           const activeItem = activeMap.get(code) || {};
           return [code, activeItem.size ? normalizeContainerSize(activeItem.size) : ""];
@@ -3978,8 +3979,8 @@
       const auditSheet = XLSX.utils.aoa_to_sheet(auditRows);
       styleAuditSectionRowsByCondition(auditSheet, auditRows, "SCANNED UNIT MATCH INVENTORY");
       XLSX.utils.book_append_sheet(wb, auditSheet, "Audit Comparison");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CONTAINER SIZE"], ...auditRowsForCodes(comparison.missingExpected, comparison)]), "ON INVENTORY NOT SCANNED");
-      const foundRows = [["UNIT NUMBER", "CONTAINER SIZE"], ...auditRowsForCodes(comparison.foundExpected, comparison)];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CONTAINER/ITEM SIZE"], ...auditRowsForCodes(comparison.missingExpected, comparison)]), "ON INVENTORY NOT SCANNED");
+      const foundRows = [["UNIT NUMBER", "CONTAINER/ITEM SIZE"], ...auditRowsForCodes(comparison.foundExpected, comparison)];
       const foundSheet = XLSX.utils.aoa_to_sheet(foundRows);
       const activeMap = activeEntryByCode();
       foundRows.slice(1).forEach((row, index) => {
@@ -3987,7 +3988,7 @@
         styleWorksheetRow(foundSheet, index + 2, row.length, conditionCellStyle(activeItem && activeItem.condition));
       });
       XLSX.utils.book_append_sheet(wb, foundSheet, "SCANNED UNIT MATCH INVENTORY");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CONTAINER SIZE"], ...comparison.extraFound.map(code => {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CONTAINER/ITEM SIZE"], ...comparison.extraFound.map(code => {
         const activeItem = activeMap.get(code) || {};
         return [code, activeItem.size ? normalizeContainerSize(activeItem.size) : ""];
       })]), "SCANNED BUT NOT ON INVENTORY");
@@ -4621,8 +4622,8 @@
       const rawItems = Array.isArray(source.items) ? source.items : [];
       let items = rawItems.map(item => ({
         code: normalizeCode(item.code || item.unitName || item["UnitName"] || ""),
-        type: normalizeOccupiedTypeSize(item.type || item.rawType || item["Type"] || item["Container Size"] || item["Unit Size"] || item["Size"] || "", item.code || item.unitName || item["UnitName"] || ""),
-        rawType: normalizeUpperText(item.rawType || item.type || item["Type"] || item["Container Size"] || item["Unit Size"] || item["Size"] || "")
+        type: normalizeOccupiedTypeSize(item.type || item.rawType || item["Type"] || item["Container/Item Size"] || item["Container Size"] || item["Unit Size"] || item["Size"] || "", item.code || item.unitName || item["UnitName"] || ""),
+        rawType: normalizeUpperText(item.rawType || item.type || item["Type"] || item["Container/Item Size"] || item["Container Size"] || item["Unit Size"] || item["Size"] || "")
       })).filter(item => isUploadedInventoryCode(item.code));
 
       if (!items.length && Array.isArray(source.codes)) {
@@ -4737,11 +4738,11 @@
       const warnings = [];
 
       if (invalid.length) {
-        warnings.push({ type: "error", text: invalid.length + " row(s) have missing or invalid container numbers. Fix the file before importing." });
+        warnings.push({ type: "error", text: invalid.length + " row(s) have missing or invalid container/item numbers. Fix the file before importing." });
       }
 
       if (internalDuplicates.length) {
-        warnings.push({ type: "error", text: "Duplicate container numbers inside import: " + internalDuplicates.slice(0, 8).join(", ") + (internalDuplicates.length > 8 ? "..." : "") + "." });
+        warnings.push({ type: "error", text: "Duplicate container/item numbers inside import: " + internalDuplicates.slice(0, 8).join(", ") + (internalDuplicates.length > 8 ? "..." : "") + "." });
       }
 
       if (currentDuplicates.length) {
