@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Zippy Shell Inventory App" />
+  <meta name="apple-mobile-web-app-title" content="Zippy Shell Inventory Entry - Doug Shelton Vol 1" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#0f172a" />
-  <title>Zippy Shell Inventory App</title>
+  <title>Zippy Shell Inventory Entry - Doug Shelton Vol 1</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <style>
     :root {
@@ -1237,7 +1237,7 @@
 <body>
   <main class="wrap">
     <header>
-      <h1>Zippy Shell Inventory App</h1>
+      <h1>Zippy Shell Inventory Entry - Doug Shelton Vol 1</h1>
       <div class="top-status">
         <span id="lockBadge" class="badge unlocked">Editing Unlocked</span>
         <span id="xlsxBadge" class="badge">XLSX loading...</span>
@@ -3341,7 +3341,7 @@
       const firstEntry = entries.length ? formatLocalTime(entries[0].timestamp) : "-";
       const lastEntry = entries.length ? formatLocalTime(entries[entries.length - 1].timestamp) : "-";
       return [
-        "ZIPPY SHELL INVENTORY APP FINAL REPORT",
+        "ZIPPY SHELL INVENTORY ENTRY - DOUG SHELTON VOL 1 FINAL REPORT",
         "",
         "Report Date: " + todayStamp(),
         "Editing Status: " + (editLocked ? "Locked after final export" : "Unlocked"),
@@ -3578,7 +3578,7 @@
 
     function buildFullAuditBackup() {
       return {
-        appName: "Zippy Shell Inventory App",
+        appName: "Zippy Shell Inventory Entry - Doug Shelton Vol 1",
         appVersion: 4,
         exportedAt: new Date().toISOString(),
         sessionName: sessionNameInput.value.trim(),
@@ -4235,7 +4235,7 @@
       const record = {
         sync_key: settings.syncName,
         payload: {
-          appName: "Zippy Shell Inventory App",
+          appName: "Zippy Shell Inventory Entry - Doug Shelton Vol 1",
           appVersion: 4,
           syncType: "monthlyOccupiedList",
           syncedAt: new Date().toISOString(),
