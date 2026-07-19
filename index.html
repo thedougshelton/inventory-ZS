@@ -1328,12 +1328,12 @@
       <div class="field-group">
         <label for="containerSize">Container size</label>
         <select id="containerSize">
-          <option value="8 ft">8 ft</option>
-          <option value="12 ft" selected>12 ft</option>
-          <option value="16 ft">16 ft</option>
-          <option value="ZM">ZM</option>
-          <option value="SHELL">SHELL</option>
-          <option value="TR">TR</option>
+          <option value="ZM" selected>ZM</option>
+          <option value="Pallet">Pallet</option>
+          <option value="Carpet Rolls">Carpet Rolls</option>
+          <option value="Large Machine">Large Machine</option>
+          <option value="Boxed Item">Boxed Item</option>
+          <option value="Miscellaneous">Miscellaneous</option>
         </select>
       </div>
 
@@ -1457,12 +1457,12 @@
           <div>
             <label for="editSize">Container size</label>
             <select id="editSize">
-              <option value="8 ft">8 ft</option>
-              <option value="12 ft">12 ft</option>
-              <option value="16 ft">16 ft</option>
               <option value="ZM">ZM</option>
-              <option value="SHELL">SHELL</option>
-              <option value="TR">TR</option>
+              <option value="Pallet">Pallet</option>
+              <option value="Carpet Rolls">Carpet Rolls</option>
+              <option value="Large Machine">Large Machine</option>
+              <option value="Boxed Item">Boxed Item</option>
+              <option value="Miscellaneous">Miscellaneous</option>
             </select>
           </div>
           <div>
@@ -1652,6 +1652,8 @@
         syncName: "ZIPPY_SHELL_WAREHOUSE_PRODUCT_OUT"
       }
     };
+    const DEFAULT_CONTAINER_SIZE = "ZM";
+    const CONTAINER_SIZES = ["ZM", "Pallet", "Carpet Rolls", "Large Machine", "Boxed Item", "Miscellaneous"];
     const CONTAINER_KEYBOARD_ROWS = [
       { className: "primary-letter", keys: ["D"] },
       { className: "numbers", keys: ["1", "2", "3", "4", "5"] },
@@ -1874,7 +1876,7 @@
 
     function saveEntryFormState(presetKey = selectedCloudPresetKey()) {
       return safeSetItem(entryFormStateStorageKey(presetKey), JSON.stringify({
-        size: sizeSelect.value || "12 ft",
+        size: sizeSelect.value || DEFAULT_CONTAINER_SIZE,
         condition: getRadioValue("containerCondition") || "Good",
         status: getRadioValue("containerStatus") || "Built"
       }));
@@ -1898,7 +1900,7 @@
       return {
         sequence,
         code: normalizeCode(item.code || item["Container Number"] || item.containerNumber || ""),
-        size: item.size || item["Container Size"] || item.containerSize || "12 ft",
+        size: normalizeContainerSize(item.size || item["Container Size"] || item.containerSize || DEFAULT_CONTAINER_SIZE),
         condition: item.condition || item["Container Condition"] || item.containerCondition || "Good",
         status: item.status || item["Container Status"] || item.containerStatus || "Built",
         initials: normalizeInitials(item.initials || item["Employee/User Initials"] || item["Initials"] || ""),
@@ -2117,6 +2119,19 @@
 
     function normalizeUpperText(value) {
       return String(value || "").toUpperCase();
+    }
+
+    function normalizeContainerSize(value) {
+      const text = normalizeUpperText(value).replace(/\s+/g, " ").trim();
+      if (!text) return DEFAULT_CONTAINER_SIZE;
+      if (text === "ZM" || text.startsWith("ZM ")) return "ZM";
+      if (/\bPALLET(S)?\b/.test(text)) return "Pallet";
+      if (/\bCARPET\b/.test(text) || /\bROLL(S)?\b/.test(text)) return "Carpet Rolls";
+      if (/\bLARGE\s+MACHINE\b/.test(text) || /\bMACHINE(S)?\b/.test(text)) return "Large Machine";
+      if (/\bBOXED\s+ITEM\b/.test(text) || /\bBOX(ED|ES)?\b/.test(text)) return "Boxed Item";
+      if (/\bMISC(ELLANEOUS)?\b/.test(text) || /\bOTHER\b/.test(text)) return "Miscellaneous";
+      const exact = CONTAINER_SIZES.find(size => normalizeUpperText(size) === text);
+      return exact || text;
     }
 
     function normalizeSearch(value) {
@@ -2539,7 +2554,7 @@
 
       [
         "ENTRY #" + item.sequence,
-        "SIZE: " + normalizeUpperText(item.size || "12 FT"),
+        "SIZE: " + normalizeUpperText(item.size || DEFAULT_CONTAINER_SIZE),
         "CONDITION: " + normalizeUpperText(item.condition || "GOOD"),
         "STATUS: " + normalizeUpperText(item.status || "BUILT")
       ].forEach((line, index) => {
@@ -2611,7 +2626,7 @@
       entries.push({
         sequence: Number(item.sequence),
         code: item.code,
-        size: item.size || "12 ft",
+        size: normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE),
         condition: item.condition || "Good",
         status: item.status || "Built",
         initials: item.initials || "",
@@ -2644,7 +2659,7 @@
       editingSequence = sequence;
       editTitle.textContent = "Edit Entry #" + sequence;
       editCode.value = item.code;
-      editSize.value = item.size || "12 ft";
+      editSize.value = normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE);
       editCondition.value = item.condition || "Good";
       editStatus.value = item.status || "Built";
       editInitials.value = item.initials || "";
@@ -2910,8 +2925,6 @@
       }
     }
 
-    const CONTAINER_SIZES = ["8 ft", "12 ft", "16 ft", "ZM", "SHELL", "TR"];
-
     function styleActiveRowsByCondition(ws, activeRows) {
       const columnCount = Object.keys(activeRows[0] || {}).length;
       activeRows.forEach((row, index) => {
@@ -2981,9 +2994,9 @@
     }
 
     function sizeSummaryRows() {
-      const detailedSizes = new Set(["8 ft", "12 ft", "16 ft", "ZM"]);
+      const detailedSizes = new Set(CONTAINER_SIZES);
       return CONTAINER_SIZES.flatMap(size => {
-        const sizeEntries = entries.filter(item => item.size === size);
+        const sizeEntries = entries.filter(item => normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE) === size);
         const rows = [[
           size,
           sizeEntries.length,
@@ -3733,10 +3746,7 @@
     function normalizeOccupiedTypeSize(value, code) {
       if (normalizeCode(code || "").startsWith("ZM")) return "ZM";
       const text = normalizeUpperText(value).replace(/\s+/g, " ").trim();
-      if (/\b0?8\s*FT\b/.test(text)) return "8 ft";
-      if (/\b12\s*FT\b/.test(text)) return "12 ft";
-      if (/\b16\s*FT\b/.test(text)) return "16 ft";
-      return text;
+      return normalizeContainerSize(text || "");
     }
 
     function isUnitHeader(value) {
@@ -3883,7 +3893,7 @@
     }
 
     function normalizeSizeForCompare(value) {
-      return normalizeUpperText(value).replace(/\s+/g, "");
+      return normalizeUpperText(normalizeContainerSize(value)).replace(/\s+/g, "");
     }
 
     function sizesMatch(enteredSize, expectedSize) {
@@ -4888,7 +4898,7 @@
       const counts = {};
       orderedValues.forEach(value => counts[value] = 0);
       entries.forEach(item => {
-        const value = item[field] || "";
+        const value = field === "size" ? normalizeContainerSize(item[field] || DEFAULT_CONTAINER_SIZE) : item[field] || "";
         counts[value] = (counts[value] || 0) + 1;
       });
       return counts;
@@ -4960,7 +4970,7 @@
         meta.className = "recent-meta";
 
         [
-          item.size || "12 ft",
+          normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE),
           item.condition || "Good",
           item.status || "Built",
           inventoryTag,
@@ -4982,7 +4992,7 @@
     }
 
     function renderSummaries() {
-      renderSummaryBox(sizeSummary, summaryCounts("size", ["8 ft", "12 ft", "16 ft", "ZM", "SHELL", "TR"]), ["8 ft", "12 ft", "16 ft", "ZM", "SHELL", "TR"]);
+      renderSummaryBox(sizeSummary, summaryCounts("size", CONTAINER_SIZES), CONTAINER_SIZES);
       renderSummaryBox(conditionSummary, summaryCounts("condition", ["Good", "Bad"]), ["Good", "Bad"]);
       renderSummaryBox(statusSummary, summaryCounts("status", ["Built", "Flat"]), ["Built", "Flat"]);
 
@@ -5030,7 +5040,7 @@
         details.className = "details";
 
         [
-          item.size || "12 ft",
+          normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE),
           item.condition || "Good",
           item.status || "Built",
           inventoryTag,
