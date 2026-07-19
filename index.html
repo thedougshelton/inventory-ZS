@@ -2490,7 +2490,8 @@
         occupied: {
           fileName: occupiedMaster.fileName || "",
           importedAt: occupiedMaster.importedAt || "",
-          items: occupiedExpectedItems().map(item => [item.code, item.type || ""])
+          items: occupiedExpectedItems().map(item => [item.code, item.type || ""]),
+          rawRows: Array.isArray(occupiedMaster.rawRows) ? occupiedMaster.rawRows : []
         },
         active: entries.map(item => [
           item.sequence,
@@ -2505,7 +2506,8 @@
           item.editedAt || "",
           item.restoredAt || "",
           item.photoTakenAt || "",
-          photoSizeKb(item.photoDataUrl || "")
+          item.photoDataUrl || "",
+          item.photoThumbDataUrl || ""
         ]),
         deleted: deletedEntries.map(item => [
           item.sequence,
@@ -2520,7 +2522,8 @@
           item.deletedAt || "",
           item.deleteType || "",
           item.photoTakenAt || "",
-          photoSizeKb(item.photoDataUrl || "")
+          item.photoDataUrl || "",
+          item.photoThumbDataUrl || ""
         ])
       });
     }
