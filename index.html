@@ -1333,6 +1333,7 @@
           <option value="Carpet Rolls">Carpet Rolls</option>
           <option value="Large Machine">Large Machine</option>
           <option value="Boxed Item">Boxed Item</option>
+          <option value="Crate">Crate</option>
           <option value="Miscellaneous">Miscellaneous</option>
         </select>
       </div>
@@ -1462,6 +1463,7 @@
               <option value="Carpet Rolls">Carpet Rolls</option>
               <option value="Large Machine">Large Machine</option>
               <option value="Boxed Item">Boxed Item</option>
+              <option value="Crate">Crate</option>
               <option value="Miscellaneous">Miscellaneous</option>
             </select>
           </div>
@@ -1653,7 +1655,7 @@
       }
     };
     const DEFAULT_CONTAINER_SIZE = "ZM";
-    const CONTAINER_SIZES = ["ZM", "Pallet", "Carpet Rolls", "Large Machine", "Boxed Item", "Miscellaneous"];
+    const CONTAINER_SIZES = ["ZM", "Pallet", "Carpet Rolls", "Large Machine", "Boxed Item", "Crate", "Miscellaneous"];
     const CONTAINER_KEYBOARD_ROWS = [
       { className: "primary-letter", keys: ["D"] },
       { className: "numbers", keys: ["1", "2", "3", "4", "5"] },
@@ -2129,6 +2131,7 @@
       if (/\bCARPET\b/.test(text) || /\bROLL(S)?\b/.test(text)) return "Carpet Rolls";
       if (/\bLARGE\s+MACHINE\b/.test(text) || /\bMACHINE(S)?\b/.test(text)) return "Large Machine";
       if (/\bBOXED\s+ITEM\b/.test(text) || /\bBOX(ED|ES)?\b/.test(text)) return "Boxed Item";
+      if (/\bCRATE(S)?\b/.test(text)) return "Crate";
       if (/\bMISC(ELLANEOUS)?\b/.test(text) || /\bOTHER\b/.test(text)) return "Miscellaneous";
       const exact = CONTAINER_SIZES.find(size => normalizeUpperText(size) === text);
       return exact || text;
