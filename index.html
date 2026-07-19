@@ -2334,7 +2334,7 @@
 
       const latest = latestEntry();
       if (!latest) {
-        setStatus("Save a container entry first, then take a photo.", "warning");
+        setStatus("Save a container/item entry first, then take a photo.", "warning");
         updateUnitPhotoControls();
         return;
       }
@@ -2527,9 +2527,9 @@
       if (sizeMismatch) {
         setStatus("Saved #" + sequence + " " + code + ", but size is incorrect. Expected " + expectedSize + " from uploaded document, entered " + size + ".", "warning");
       } else if (hasUploadedInventory && !hasInventoryMatch) {
-        setStatus("Saved #" + sequence + " " + code + " - Scanned But Not On Inventory. This container was not found on the uploaded inventory list.", "warning");
+        setStatus("Saved #" + sequence + " " + code + " - Scanned But Not On Inventory. This container/item was not found on the uploaded inventory list.", "warning");
       } else {
-        setStatus("Saved #" + sequence + " " + code + " - " + size + ", " + condition + ", " + containerStatus + ". Ready for next container.", "success");
+        setStatus("Saved #" + sequence + " " + code + " - " + size + ", " + condition + ", " + containerStatus + ". Ready for next container/item.", "success");
       }
 
       render();
@@ -3415,7 +3415,7 @@
         "Last Saved: " + formatLocalTime(lastSavedAt),
         "",
         "NOTES",
-        "Review the Scanned Units and Audit Comparison sheets for container-level notes."
+        "Review the Scanned Units and Audit Comparison sheets for container/item-level notes."
       ].join("\n");
     }
 
@@ -3751,8 +3751,8 @@
     }
 
     function dataFromWorkbook(workbook) {
-      const activeSheet = workbook.Sheets["Active Entries"] || workbook.Sheets[workbook.SheetNames[0]];
-      const deletedSheet = workbook.Sheets["Deleted Entries"];
+      const activeSheet = workbook.Sheets["Scanned Units"] || workbook.Sheets["Active Entries"] || workbook.Sheets[workbook.SheetNames[0]];
+      const deletedSheet = workbook.Sheets["Deleted Entry"] || workbook.Sheets["Deleted Entries"];
       const activeObjects = activeSheet ? XLSX.utils.sheet_to_json(activeSheet, { defval: "" }) : [];
       const deletedObjects = deletedSheet ? XLSX.utils.sheet_to_json(deletedSheet, { defval: "" }) : [];
 
@@ -5079,7 +5079,7 @@
       activeEntriesDirty = false;
 
       if (!entries.length) {
-        list.innerHTML = '<div class="empty">No containers entered yet.</div>';
+        list.innerHTML = '<div class="empty">No container/items entered yet.</div>';
         return;
       }
 
@@ -5392,7 +5392,7 @@
     takeUnitPhotoBtn.addEventListener("click", () => {
       if (requireUnlocked("add a photo")) return;
       if (!latestEntry()) {
-        setStatus("Save a container entry first, then take a photo.", "warning");
+        setStatus("Save a container/item entry first, then take a photo.", "warning");
         updateUnitPhotoControls();
         input.focus();
         return;
