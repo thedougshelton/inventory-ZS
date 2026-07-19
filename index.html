@@ -1371,6 +1371,11 @@
         <textarea id="notesInput" autocomplete="off" placeholder="OPTIONAL NOTES, DAMAGE COMMENTS, MISSING LABEL, ETC."></textarea>
       </div>
 
+      <div class="field-group">
+        <label for="customerNameInput">Customer Name</label>
+        <input id="customerNameInput" type="text" autocomplete="off" placeholder="OPTIONAL CUSTOMER NAME" />
+      </div>
+
       <label for="containerInput">Container/Item number</label>
       <div class="entry-row">
         <input
@@ -1454,6 +1459,10 @@
           <div class="full">
             <label for="editCode">Container/Item number</label>
             <input id="editCode" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          </div>
+          <div class="full">
+            <label for="editCustomerName">Customer Name</label>
+            <input id="editCustomerName" type="text" autocomplete="off" placeholder="OPTIONAL CUSTOMER NAME" />
           </div>
           <div>
             <label for="editSize">Container/Item size</label>
@@ -1673,6 +1682,7 @@
     ];
 
     const input = document.getElementById("containerInput");
+    const customerNameInput = document.getElementById("customerNameInput");
     const notesInput = document.getElementById("notesInput");
     const sizeSelect = document.getElementById("containerSize");
     const sessionNameInput = document.getElementById("sessionName");
@@ -1725,6 +1735,7 @@
     const editPanel = document.getElementById("editPanel");
     const editTitle = document.getElementById("editTitle");
     const editCode = document.getElementById("editCode");
+    const editCustomerName = document.getElementById("editCustomerName");
     const editSize = document.getElementById("editSize");
     const editCondition = document.getElementById("editCondition");
     const editStatus = document.getElementById("editStatus");
@@ -1902,6 +1913,7 @@
       return {
         sequence,
         code: normalizeCode(item.code || item["Container/Item Number"] || item["Container Number"] || item.containerNumber || ""),
+        customerName: normalizeUpperText(item.customerName || item["Customer Name"] || item.customer || item["Customer"] || ""),
         size: normalizeContainerSize(item.size || item["Container/Item Size"] || item["Container Size"] || item.containerSize || DEFAULT_CONTAINER_SIZE),
         condition: item.condition || item["Container/Item Condition"] || item["Container Condition"] || item.containerCondition || "Good",
         status: item.status || item["Container/Item Status"] || item["Container Status"] || item.containerStatus || "Built",
@@ -2380,8 +2392,8 @@
     function currentSignature() {
       return JSON.stringify({
         session: sessionNameInput.value.trim(),
-        active: entries.map(item => [item.sequence, item.code, item.size, item.condition, item.status, item.initials || "", item.notes || "", item.timestamp, item.editedAt || ""]),
-        deleted: deletedEntries.map(item => [item.sequence, item.code, item.size, item.condition, item.status, item.initials || "", item.notes || "", item.deletedAt || "", item.deleteType || ""])
+        active: entries.map(item => [item.sequence, item.code, item.customerName || "", item.size, item.condition, item.status, item.initials || "", item.notes || "", item.timestamp, item.editedAt || ""]),
+        deleted: deletedEntries.map(item => [item.sequence, item.code, item.customerName || "", item.size, item.condition, item.status, item.initials || "", item.notes || "", item.deletedAt || "", item.deleteType || ""])
       });
     }
 
@@ -2405,6 +2417,7 @@
       if (requireUnlocked("add another entry")) return;
 
       const code = normalizeCode(input.value);
+      const customerName = normalizeUpperText(customerNameInput.value.trim());
       const size = sizeSelect.value;
       const condition = getRadioValue("containerCondition");
       const containerStatus = getRadioValue("containerStatus");
@@ -2487,6 +2500,7 @@
       entries.push({
         sequence,
         code,
+        customerName,
         size,
         condition,
         status: containerStatus,
@@ -2501,6 +2515,7 @@
       });
 
       input.value = "";
+      customerNameInput.value = "";
       notesInput.value = "";
       const saveOk = saveEntries();
       if (!saveOk) {
@@ -2525,6 +2540,7 @@
       deletedEntries.push({
         sequence: item.sequence || "",
         code: item.code || "",
+        customerName: item.customerName || "",
         size: item.size || "",
         condition: item.condition || "",
         status: item.status || "",
@@ -2557,10 +2573,11 @@
 
       [
         "ENTRY #" + item.sequence,
+        item.customerName ? "CUSTOMER: " + normalizeUpperText(item.customerName) : "",
         "SIZE: " + normalizeUpperText(item.size || DEFAULT_CONTAINER_SIZE),
         "CONDITION: " + normalizeUpperText(item.condition || "GOOD"),
         "STATUS: " + normalizeUpperText(item.status || "BUILT")
-      ].forEach((line, index) => {
+      ].filter(Boolean).forEach((line, index) => {
         const detail = document.createElement(index === 0 ? "strong" : "div");
         detail.textContent = line;
         deleteConfirmDetails.appendChild(detail);
@@ -2629,6 +2646,7 @@
       entries.push({
         sequence: Number(item.sequence),
         code: item.code,
+        customerName: item.customerName || "",
         size: normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE),
         condition: item.condition || "Good",
         status: item.status || "Built",
@@ -2662,6 +2680,7 @@
       editingSequence = sequence;
       editTitle.textContent = "Edit Entry #" + sequence;
       editCode.value = item.code;
+      editCustomerName.value = item.customerName || "";
       editSize.value = normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE);
       editCondition.value = item.condition || "Good";
       editStatus.value = item.status || "Built";
@@ -2676,6 +2695,7 @@
       editingSequence = null;
       editPanel.classList.remove("open");
       editCode.value = "";
+      editCustomerName.value = "";
       input.focus();
     }
 
@@ -2716,6 +2736,7 @@
       }
 
       item.code = code;
+      item.customerName = normalizeUpperText(editCustomerName.value.trim());
       item.size = editSize.value;
       item.condition = editCondition.value;
       item.status = editStatus.value;
@@ -2978,7 +2999,7 @@
     function expectedUnitsRows() {
       const activeMap = activeEntryByCode();
       return [
-        ["UNIT NUMBER", "UPLOADED UNIT SIZE", "PHYSICALLY FOUND", "CONTAINER/ITEM CONDITION", "ENTERED UNIT SIZE", "SIZE CHECK"],
+        ["UNIT NUMBER", "UPLOADED UNIT SIZE", "PHYSICALLY FOUND", "CUSTOMER NAME", "CONTAINER/ITEM CONDITION", "ENTERED UNIT SIZE", "SIZE CHECK"],
         ...occupiedExpectedItems().map(item => {
           const activeItem = activeMap.get(item.code);
           const found = Boolean(activeItem);
@@ -2988,6 +3009,7 @@
             item.code,
             expectedSize,
             found ? "YES" : "",
+            found ? activeItem.customerName || "" : "",
             found ? activeItem.condition || "" : "",
             enteredSize,
             found && expectedSize && enteredSize && !sizesMatch(enteredSize, expectedSize) ? "SIZE MISMATCH" : ""
@@ -3024,11 +3046,12 @@
     function mismatchSheetRows() {
       const activeMap = activeEntryByCode();
       return [
-        ["UNIT NUMBER", "EXPECTED SIZE", "ENTERED SIZE", "CONTAINER/ITEM CONDITION", "CONTAINER/ITEM STATUS", "EMPLOYEE/USER INITIALS", "DATE/TIME ENTERED"],
+        ["UNIT NUMBER", "CUSTOMER NAME", "EXPECTED SIZE", "ENTERED SIZE", "CONTAINER/ITEM CONDITION", "CONTAINER/ITEM STATUS", "EMPLOYEE/USER INITIALS", "DATE/TIME ENTERED"],
         ...occupiedComparison().sizeMismatches.map(item => {
           const activeItem = activeMap.get(item.code) || {};
           return [
             item.code,
+            activeItem.customerName || "",
             item.expectedSize,
             item.enteredSize,
             activeItem.condition || "",
@@ -3073,6 +3096,7 @@
       return entries.map(item => ({
         "Entry Number": item.sequence || "",
         "Container/Item Number": item.code || "",
+        "Customer Name": item.customerName || "",
         "Container/Item Size": item.size || "",
         "Container/Item Condition": item.condition || "",
         "Container/Item Status": item.status || "",
@@ -3091,6 +3115,7 @@
       return deletedEntries.map(item => ({
         "Entry Number": item.sequence || "",
         "Container/Item Number": item.code || "",
+        "Customer Name": item.customerName || "",
         "Container/Item Size": item.size || "",
         "Container/Item Condition": item.condition || "",
         "Container/Item Status": item.status || "",
@@ -3131,6 +3156,7 @@
           "Scanned Entry Number",
           "Scanned Unit Size",
           "Size Check",
+          "Customer Name",
           "Container/Item Condition",
           "Container/Item Status",
           "Employee/User Initials",
@@ -3142,6 +3168,7 @@
           "Restored Date/Time",
           "Deleted Entry Number",
           "Deleted Unit Size",
+          "Deleted Customer Name",
           "Deleted Condition",
           "Deleted Status",
           "Deleted Notes",
@@ -3185,6 +3212,7 @@
           activeItem ? activeItem.sequence || "" : "",
           enteredSize,
           sizeCheck,
+          activeItem ? activeItem.customerName || "" : "",
           activeItem ? activeItem.condition || "" : "",
           activeItem ? activeItem.status || "" : "",
           activeItem ? activeItem.initials || "" : "",
@@ -3196,6 +3224,7 @@
           activeItem ? formatLocalTime(activeItem.restoredAt) : "",
           deletedItem ? deletedItem.sequence || "" : "",
           deletedItem ? deletedItem.size || "" : "",
+          deletedItem ? deletedItem.customerName || "" : "",
           deletedItem ? deletedItem.condition || "" : "",
           deletedItem ? deletedItem.status || "" : "",
           deletedItem ? deletedItem.notes || "" : "",
@@ -3210,14 +3239,14 @@
 
     function styleAuditComparisonCombinedSheet(ws, rows) {
       rows.slice(1).forEach((row, index) => {
-        const condition = row[8] || row[19] || "";
+        const condition = row[9] || row[21] || "";
         styleWorksheetRow(ws, index + 2, row.length, conditionCellStyle(condition));
       });
     }
 
     function pictureRows() {
       const rows = [
-        ["Photo Preview", "Entry Number", "Container/Item Number", "List", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Photo Date/Time", "Compressed Photo Size KB", "Thumbnail Size KB", "Notes"]
+        ["Photo Preview", "Entry Number", "Container/Item Number", "Customer Name", "List", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Photo Date/Time", "Compressed Photo Size KB", "Thumbnail Size KB", "Notes"]
       ];
 
       [
@@ -3228,6 +3257,7 @@
           "",
           item.sequence || "",
           item.code || "",
+          item.customerName || "",
           item.source,
           item.size || "",
           item.condition || "",
@@ -3257,6 +3287,7 @@
         { wch: 18 },
         { wch: 12 },
         { wch: 18 },
+        { wch: 22 },
         { wch: 10 },
         { wch: 16 },
         { wch: 18 },
@@ -3283,16 +3314,17 @@
         } else {
           ws[previewRef] = { t: "s", v: "PREVIEW TOO LARGE" };
         }
-        styleWorksheetRow(ws, rowNumber, 11, conditionCellStyle(item.condition));
+        styleWorksheetRow(ws, rowNumber, 12, conditionCellStyle(item.condition));
       });
     }
 
     function activeCsvRows() {
       return [
-        ["Entry Number", "Container/Item Number", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"],
+        ["Entry Number", "Container/Item Number", "Customer Name", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"],
         ...entries.map(item => [
           item.sequence || "",
           item.code || "",
+          item.customerName || "",
           item.size || "",
           item.condition || "",
           item.status || "",
@@ -3309,10 +3341,11 @@
 
     function deletedCsvRows() {
       return [
-        ["Entry Number", "Container/Item Number", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Original Date/Time Entered", "Edited Date/Time", "Deleted Date/Time", "Deleted By"],
+        ["Entry Number", "Container/Item Number", "Customer Name", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Original Date/Time Entered", "Edited Date/Time", "Deleted Date/Time", "Deleted By"],
         ...deletedEntries.map(item => [
           item.sequence || "",
           item.code || "",
+          item.customerName || "",
           item.size || "",
           item.condition || "",
           item.status || "",
@@ -3439,13 +3472,14 @@
       const comparison = occupiedComparison();
       const activeMap = activeEntryByCode();
       const rows = [
-        ["Entry Number", "Container/Item Number", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"]
+        ["Entry Number", "Container/Item Number", "Customer Name", "Container/Item Size", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"]
       ];
       comparison.extraFound.forEach(code => {
         const item = activeMap.get(code) || {};
         rows.push([
           item.sequence || "",
           code,
+          item.customerName || "",
           item.size || "",
           item.condition || "",
           item.status || "",
@@ -3466,7 +3500,7 @@
       const comparison = occupiedComparison();
       const activeMap = activeEntryByCode();
       const rows = [
-        ["Unit Number", "Uploaded Unit Size", "Scanned Entry Number", "Scanned Unit Size", "Size Check", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"]
+        ["Unit Number", "Uploaded Unit Size", "Scanned Entry Number", "Customer Name", "Scanned Unit Size", "Size Check", "Container/Item Condition", "Container/Item Status", "Employee/User Initials", "Notes", "Photo Attached", "Photo Date/Time", "Date/Time Entered", "Edited Date/Time", "Restored Date/Time"]
       ];
       comparison.foundExpected.forEach(code => {
         const expectedItem = comparison.itemByCode.get(code) || {};
@@ -3477,6 +3511,7 @@
           code,
           expectedSize,
           activeItem.sequence || "",
+          activeItem.customerName || "",
           scannedSize,
           expectedSize && scannedSize && !sizesMatch(scannedSize, expectedSize) ? "SIZE MISMATCH" : expectedSize ? "MATCH" : "",
           activeItem.condition || "",
@@ -3532,7 +3567,7 @@
 
       const extraRows = scannedButNotOnInventoryRows();
       const extraSheet = XLSX.utils.aoa_to_sheet(extraRows);
-      styleAoaRowsByCondition(extraSheet, extraRows, 3);
+      styleAoaRowsByCondition(extraSheet, extraRows, 4);
       XLSX.utils.book_append_sheet(wb, extraSheet, "Scanned But Not On Inventory");
 
       const picturesSheet = XLSX.utils.aoa_to_sheet(pictureRows());
@@ -3548,12 +3583,12 @@
 
       const expectedScannedRows = expectedAndScannedRows();
       const expectedScannedSheet = XLSX.utils.aoa_to_sheet(expectedScannedRows);
-      styleAoaRowsByCondition(expectedScannedSheet, expectedScannedRows, 5);
+      styleAoaRowsByCondition(expectedScannedSheet, expectedScannedRows, 6);
       XLSX.utils.book_append_sheet(wb, expectedScannedSheet, "Scanned Units Match Inventory");
 
       const sizeMismatchRows = mismatchSheetRows();
       const sizeMismatchSheet = XLSX.utils.aoa_to_sheet(sizeMismatchRows);
-      styleAoaRowsByCondition(sizeMismatchSheet, sizeMismatchRows, 3);
+      styleAoaRowsByCondition(sizeMismatchSheet, sizeMismatchRows, 4);
       XLSX.utils.book_append_sheet(wb, sizeMismatchSheet, "Unit Size Not Matched");
 
       const filename = safeFilePart(sessionNameInput.value) + (finalLock ? "_FINAL_" : "_inventory_") + dateStamp() + ".xlsx";
@@ -3942,18 +3977,22 @@
         ["SIZE MISMATCHES", comparison.sizeMismatches.length],
         [],
         ["SCANNED UNIT MATCH INVENTORY"],
-        ["UNIT NUMBER", "CONTAINER/ITEM SIZE"],
-        ...auditRowsForCodes(comparison.foundExpected, comparison),
+        ["UNIT NUMBER", "CUSTOMER NAME", "CONTAINER/ITEM SIZE"],
+        ...comparison.foundExpected.map(code => {
+          const activeItem = activeMap.get(code) || {};
+          const expectedItem = comparison.itemByCode.get(code) || { type: "" };
+          return [code, activeItem.customerName || "", expectedItem.type || ""];
+        }),
         [],
         ["ON INVENTORY NOT SCANNED"],
         ["UNIT NUMBER", "CONTAINER/ITEM SIZE"],
         ...auditRowsForCodes(comparison.missingExpected, comparison),
         [],
         ["SCANNED BUT NOT ON INVENTORY"],
-        ["UNIT NUMBER", "CONTAINER/ITEM SIZE"],
+        ["UNIT NUMBER", "CUSTOMER NAME", "CONTAINER/ITEM SIZE"],
         ...comparison.extraFound.map(code => {
           const activeItem = activeMap.get(code) || {};
-          return [code, activeItem.size ? normalizeContainerSize(activeItem.size) : ""];
+          return [code, activeItem.customerName || "", activeItem.size ? normalizeContainerSize(activeItem.size) : ""];
         }),
         [],
         ["SIZE MISMATCHES"],
@@ -3980,7 +4019,11 @@
       styleAuditSectionRowsByCondition(auditSheet, auditRows, "SCANNED UNIT MATCH INVENTORY");
       XLSX.utils.book_append_sheet(wb, auditSheet, "Audit Comparison");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CONTAINER/ITEM SIZE"], ...auditRowsForCodes(comparison.missingExpected, comparison)]), "ON INVENTORY NOT SCANNED");
-      const foundRows = [["UNIT NUMBER", "CONTAINER/ITEM SIZE"], ...auditRowsForCodes(comparison.foundExpected, comparison)];
+      const foundRows = [["UNIT NUMBER", "CUSTOMER NAME", "CONTAINER/ITEM SIZE"], ...comparison.foundExpected.map(code => {
+        const activeItem = activeMap.get(code) || {};
+        const expectedItem = comparison.itemByCode.get(code) || { type: "" };
+        return [code, activeItem.customerName || "", expectedItem.type || ""];
+      })];
       const foundSheet = XLSX.utils.aoa_to_sheet(foundRows);
       const activeMap = activeEntryByCode();
       foundRows.slice(1).forEach((row, index) => {
@@ -3988,9 +4031,9 @@
         styleWorksheetRow(foundSheet, index + 2, row.length, conditionCellStyle(activeItem && activeItem.condition));
       });
       XLSX.utils.book_append_sheet(wb, foundSheet, "SCANNED UNIT MATCH INVENTORY");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CONTAINER/ITEM SIZE"], ...comparison.extraFound.map(code => {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CUSTOMER NAME", "CONTAINER/ITEM SIZE"], ...comparison.extraFound.map(code => {
         const activeItem = activeMap.get(code) || {};
-        return [code, activeItem.size ? normalizeContainerSize(activeItem.size) : ""];
+        return [code, activeItem.customerName || "", activeItem.size ? normalizeContainerSize(activeItem.size) : ""];
       })]), "SCANNED BUT NOT ON INVENTORY");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mismatchSheetRows()), "SIZE MISMATCHES");
       appendOccupiedUploadSheets(wb);
@@ -4990,6 +5033,7 @@
 
         [
           normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE),
+          item.customerName ? "Customer: " + item.customerName : "",
           item.condition || "Good",
           item.status || "Built",
           inventoryTag,
@@ -5060,6 +5104,7 @@
 
         [
           normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE),
+          item.customerName ? "Customer: " + item.customerName : "",
           item.condition || "Good",
           item.status || "Built",
           inventoryTag,
@@ -5148,6 +5193,7 @@
 
         [
           item.size || "",
+          item.customerName ? "Customer: " + item.customerName : "",
           item.condition || "",
           item.status || "",
           item.photoDataUrl ? "Photo" : "",
@@ -5267,6 +5313,14 @@
 
     editCode.addEventListener("input", () => {
       editCode.value = normalizeCode(editCode.value);
+    });
+
+    customerNameInput.addEventListener("input", () => {
+      customerNameInput.value = normalizeUpperText(customerNameInput.value);
+    });
+
+    editCustomerName.addEventListener("input", () => {
+      editCustomerName.value = normalizeUpperText(editCustomerName.value);
     });
 
     employeeInitialsInput.addEventListener("input", () => {
