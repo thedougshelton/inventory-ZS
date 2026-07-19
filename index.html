@@ -2994,7 +2994,6 @@
     }
 
     function sizeSummaryRows() {
-      const detailedSizes = new Set(CONTAINER_SIZES);
       return CONTAINER_SIZES.flatMap(size => {
         const sizeEntries = entries.filter(item => normalizeContainerSize(item.size || DEFAULT_CONTAINER_SIZE) === size);
         const rows = [[
@@ -3006,7 +3005,7 @@
           sizeEntries.filter(item => item.status === "Flat").length
         ]];
 
-        if (detailedSizes.has(size)) {
+        if (size === "ZM") {
           rows.push(
             [size + " - Good Built", sizeEntries.filter(item => item.condition === "Good" && item.status === "Built").length, "", "", "", ""],
             [size + " - Good Flat", sizeEntries.filter(item => item.condition === "Good" && item.status === "Flat").length, "", "", "", ""],
@@ -3123,6 +3122,7 @@
         [
           "Audit Status",
           "Unit Number",
+          "Container Size",
           "Uploaded Unit Size",
           "Physically Found",
           "Scanned Entry Number",
@@ -3153,6 +3153,13 @@
         const deletedItem = deletedMap.get(code) || null;
         const expectedSize = expectedItem.type || "";
         const enteredSize = activeItem ? activeItem.size || "" : "";
+        const containerSize = activeItem
+          ? normalizeContainerSize(activeItem.size || DEFAULT_CONTAINER_SIZE)
+          : expectedSize
+          ? normalizeContainerSize(expectedSize)
+          : deletedItem
+          ? normalizeContainerSize(deletedItem.size || DEFAULT_CONTAINER_SIZE)
+          : "";
         const sizeCheck = activeItem && expectedSize && enteredSize && !sizesMatch(enteredSize, expectedSize)
           ? "SIZE MISMATCH"
           : activeItem && expectedSize
@@ -3169,6 +3176,7 @@
         rows.push([
           status,
           code,
+          containerSize,
           expectedSize,
           activeItem ? "YES" : "",
           activeItem ? activeItem.sequence || "" : "",
@@ -3199,7 +3207,7 @@
 
     function styleAuditComparisonCombinedSheet(ws, rows) {
       rows.slice(1).forEach((row, index) => {
-        const condition = row[7] || row[18] || "";
+        const condition = row[8] || row[19] || "";
         styleWorksheetRow(ws, index + 2, row.length, conditionCellStyle(condition));
       });
     }
@@ -3503,11 +3511,6 @@
 
       const wb = XLSX.utils.book_new();
 
-      const auditRows = auditComparisonCombinedRows();
-      const auditSheet = XLSX.utils.aoa_to_sheet(auditRows);
-      styleAuditComparisonCombinedSheet(auditSheet, auditRows);
-      XLSX.utils.book_append_sheet(wb, auditSheet, "Audit Comparison");
-
       const reportSheet = XLSX.utils.aoa_to_sheet(finalReportSummaryRows());
       XLSX.utils.book_append_sheet(wb, reportSheet, "Final Report");
 
@@ -3515,6 +3518,11 @@
       const activeSheet = XLSX.utils.json_to_sheet(activeRows);
       styleActiveRowsByCondition(activeSheet, activeRows);
       XLSX.utils.book_append_sheet(wb, activeSheet, "Scanned Units");
+
+      const auditRows = auditComparisonCombinedRows();
+      const auditSheet = XLSX.utils.aoa_to_sheet(auditRows);
+      styleAuditComparisonCombinedSheet(auditSheet, auditRows);
+      XLSX.utils.book_append_sheet(wb, auditSheet, "Audit Comparison");
 
       const expectedNotScannedRows = expectedUnitsNotScannedRows();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expectedNotScannedRows), "Expected Units Not Scanned");
@@ -3918,6 +3926,7 @@
 
     function auditComparisonRows() {
       const comparison = occupiedComparison();
+      const activeMap = activeEntryByCode();
       return [
         ["UPLOADED DOCUMENT FILE", occupiedMaster.fileName || ""],
         ["UPLOADED DOCUMENT IMPORTED", formatLocalTime(occupiedMaster.importedAt)],
@@ -3929,16 +3938,19 @@
         ["SIZE MISMATCHES", comparison.sizeMismatches.length],
         [],
         ["SCANNED UNIT MATCH INVENTORY"],
-        ["UNIT NUMBER", "UNIT SIZE"],
+        ["UNIT NUMBER", "CONTAINER SIZE"],
         ...auditRowsForCodes(comparison.foundExpected, comparison),
         [],
         ["ON INVENTORY NOT SCANNED"],
-        ["UNIT NUMBER", "UNIT SIZE"],
+        ["UNIT NUMBER", "CONTAINER SIZE"],
         ...auditRowsForCodes(comparison.missingExpected, comparison),
         [],
         ["SCANNED BUT NOT ON INVENTORY"],
-        ["UNIT NUMBER", "UNIT SIZE"],
-        ...comparison.extraFound.map(code => [code, ""]),
+        ["UNIT NUMBER", "CONTAINER SIZE"],
+        ...comparison.extraFound.map(code => {
+          const activeItem = activeMap.get(code) || {};
+          return [code, activeItem.size ? normalizeContainerSize(activeItem.size) : ""];
+        }),
         [],
         ["SIZE MISMATCHES"],
         ["UNIT NUMBER", "EXPECTED SIZE", "ENTERED SIZE"],
@@ -3963,8 +3975,8 @@
       const auditSheet = XLSX.utils.aoa_to_sheet(auditRows);
       styleAuditSectionRowsByCondition(auditSheet, auditRows, "SCANNED UNIT MATCH INVENTORY");
       XLSX.utils.book_append_sheet(wb, auditSheet, "Audit Comparison");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "UNIT SIZE"], ...auditRowsForCodes(comparison.missingExpected, comparison)]), "ON INVENTORY NOT SCANNED");
-      const foundRows = [["UNIT NUMBER", "UNIT SIZE"], ...auditRowsForCodes(comparison.foundExpected, comparison)];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CONTAINER SIZE"], ...auditRowsForCodes(comparison.missingExpected, comparison)]), "ON INVENTORY NOT SCANNED");
+      const foundRows = [["UNIT NUMBER", "CONTAINER SIZE"], ...auditRowsForCodes(comparison.foundExpected, comparison)];
       const foundSheet = XLSX.utils.aoa_to_sheet(foundRows);
       const activeMap = activeEntryByCode();
       foundRows.slice(1).forEach((row, index) => {
@@ -3972,7 +3984,10 @@
         styleWorksheetRow(foundSheet, index + 2, row.length, conditionCellStyle(activeItem && activeItem.condition));
       });
       XLSX.utils.book_append_sheet(wb, foundSheet, "SCANNED UNIT MATCH INVENTORY");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "UNIT SIZE"], ...comparison.extraFound.map(code => [code, ""])]), "SCANNED BUT NOT ON INVENTORY");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["UNIT NUMBER", "CONTAINER SIZE"], ...comparison.extraFound.map(code => {
+        const activeItem = activeMap.get(code) || {};
+        return [code, activeItem.size ? normalizeContainerSize(activeItem.size) : ""];
+      })]), "SCANNED BUT NOT ON INVENTORY");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mismatchSheetRows()), "SIZE MISMATCHES");
       appendOccupiedUploadSheets(wb);
       const filename = safeFilePart(sessionNameInput.value) + "_occupied_audit_" + dateStamp() + ".xlsx";
