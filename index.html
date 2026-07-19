@@ -3511,13 +3511,13 @@
 
       const wb = XLSX.utils.book_new();
 
-      const reportSheet = XLSX.utils.aoa_to_sheet(finalReportSummaryRows());
-      XLSX.utils.book_append_sheet(wb, reportSheet, "Final Report");
-
       const activeRows = activeArray();
       const activeSheet = XLSX.utils.json_to_sheet(activeRows);
       styleActiveRowsByCondition(activeSheet, activeRows);
       XLSX.utils.book_append_sheet(wb, activeSheet, "Scanned Units");
+
+      const reportSheet = XLSX.utils.aoa_to_sheet(finalReportSummaryRows());
+      XLSX.utils.book_append_sheet(wb, reportSheet, "Final Report");
 
       const auditRows = auditComparisonCombinedRows();
       const auditSheet = XLSX.utils.aoa_to_sheet(auditRows);
