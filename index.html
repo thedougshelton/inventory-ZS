@@ -1302,12 +1302,12 @@
         <div class="session-row cloud-preset-row">
           <div>
             <label for="cloudPreset" class="cloud-preset-label">
-              <span>Select your branch</span>
-              <span>Inventory Audit Type</span>
+              <span>Select Your Branch Inventory Audit Type</span>
             </label>
             <select id="cloudPreset">
-              <option value="zippy_occupied">Zippy Shell Occupied Audit</option>
-              <option value="zippy_vacant">Zippy Shell Vacant Audit</option>
+              <option value="zippy_warehouse_audit">Zippy Shell Warehouse Audit</option>
+              <option value="zippy_product_in">Zippy Shell Warehouse Product In</option>
+              <option value="zippy_product_out">Zippy Shell Warehouse Product Out</option>
             </select>
           </div>
           <button id="loadCloudCombinedBtn" type="button">Load From Cloud</button>
@@ -1629,21 +1629,27 @@
     const CLOUD_TABLE = "inventory_pr_cloud";
     const DEFAULT_CLOUD_URL = "https://yxrqclpcggymogksaksx.supabase.co";
     const DEFAULT_CLOUD_PUBLISHABLE_KEY = "sb_publishable_0DGNrasYAczpaQS95MFJcg_GUVLej-Z";
-    const DEFAULT_CLOUD_SYNC_NAME = "ZIPPY_SHELL_OCCUPIED_AUDIT";
+    const DEFAULT_CLOUD_SYNC_NAME = "ZIPPY_SHELL_WAREHOUSE_AUDIT";
     const CLOUD_SAVE_PIN = "6159";
     const CLOUD_PRESET_KEY = "zippy_shell_inventory_cloud_preset_v1";
     const CLOUD_PRESETS = {
-      zippy_occupied: {
-        label: "Zippy Shell Occupied Audit",
+      zippy_warehouse_audit: {
+        label: "Zippy Shell Warehouse Audit",
         url: DEFAULT_CLOUD_URL,
         anonKey: DEFAULT_CLOUD_PUBLISHABLE_KEY,
         syncName: DEFAULT_CLOUD_SYNC_NAME
       },
-      zippy_vacant: {
-        label: "Zippy Shell Vacant Audit",
+      zippy_product_in: {
+        label: "Zippy Shell Warehouse Product In",
         url: DEFAULT_CLOUD_URL,
         anonKey: DEFAULT_CLOUD_PUBLISHABLE_KEY,
-        syncName: "ZIPPY_SHELL_VACANT_AUDIT"
+        syncName: "ZIPPY_SHELL_WAREHOUSE_PRODUCT_IN"
+      },
+      zippy_product_out: {
+        label: "Zippy Shell Warehouse Product Out",
+        url: DEFAULT_CLOUD_URL,
+        anonKey: DEFAULT_CLOUD_PUBLISHABLE_KEY,
+        syncName: "ZIPPY_SHELL_WAREHOUSE_PRODUCT_OUT"
       }
     };
     const CONTAINER_KEYBOARD_ROWS = [
@@ -1756,7 +1762,7 @@
     const activeEntriesDetails = document.getElementById("activeEntriesDetails");
     const deletedEntriesDetails = document.getElementById("deletedEntriesDetails");
 
-    cloudPresetSelect.value = CLOUD_PRESETS[localStorage.getItem(CLOUD_PRESET_KEY)] ? localStorage.getItem(CLOUD_PRESET_KEY) : "zippy_occupied";
+    cloudPresetSelect.value = CLOUD_PRESETS[localStorage.getItem(CLOUD_PRESET_KEY)] ? localStorage.getItem(CLOUD_PRESET_KEY) : "zippy_warehouse_audit";
     let activeCloudPresetKey = selectedCloudPresetKey();
 
     let entries = loadEntries();
@@ -1794,14 +1800,14 @@
 
     function loadSessionName(presetKey = selectedCloudPresetKey()) {
       const saved = localStorage.getItem(sessionNameStorageKey(presetKey));
-      const legacySaved = presetKey === "zippy_occupied" ? localStorage.getItem(SESSION_KEY) : null;
+      const legacySaved = presetKey === "zippy_warehouse_audit" ? localStorage.getItem(SESSION_KEY) : null;
       return normalizeUpperText(saved || legacySaved || defaultSessionName());
     }
 
     function saveSessionName(presetKey = selectedCloudPresetKey()) {
       const value = normalizeUpperText(sessionNameInput.value.trim() || defaultSessionName());
       const ok = safeSetItem(sessionNameStorageKey(presetKey), value);
-      if (ok && presetKey === "zippy_occupied") safeSetItem(SESSION_KEY, value);
+      if (ok && presetKey === "zippy_warehouse_audit") safeSetItem(SESSION_KEY, value);
       return ok;
     }
 
@@ -1811,14 +1817,14 @@
 
     function loadEmployeeInitials(presetKey = selectedCloudPresetKey()) {
       const saved = localStorage.getItem(employeeInitialsStorageKey(presetKey));
-      const legacySaved = presetKey === "zippy_occupied" ? localStorage.getItem(INITIALS_KEY) : null;
+      const legacySaved = presetKey === "zippy_warehouse_audit" ? localStorage.getItem(INITIALS_KEY) : null;
       return normalizeInitials(saved || legacySaved || "");
     }
 
     function saveEmployeeInitials(presetKey = selectedCloudPresetKey()) {
       const value = normalizeInitials(employeeInitialsInput.value.trim());
       const ok = safeSetItem(employeeInitialsStorageKey(presetKey), value);
-      if (ok && presetKey === "zippy_occupied") safeSetItem(INITIALS_KEY, value);
+      if (ok && presetKey === "zippy_warehouse_audit") safeSetItem(INITIALS_KEY, value);
       return ok;
     }
 
@@ -1841,7 +1847,7 @@
     }
 
     function legacyKeysForPreset(presetKey, keys) {
-      return presetKey === "zippy_occupied" ? keys : [];
+      return presetKey === "zippy_warehouse_audit" ? keys : [];
     }
 
     function getRadioValue(name) {
@@ -1994,7 +2000,7 @@
       try {
         const presetKey = selectedCloudPresetKey();
         const saved = localStorage.getItem(occupiedMasterStorageKey(presetKey));
-        const legacySaved = presetKey === "zippy_occupied" ? localStorage.getItem(MONTHLY_OCCUPIED_KEY) : null;
+        const legacySaved = presetKey === "zippy_warehouse_audit" ? localStorage.getItem(MONTHLY_OCCUPIED_KEY) : null;
         const parsed = JSON.parse(saved || legacySaved || "{}");
         return cleanOccupiedMaster(parsed);
       } catch {
@@ -2081,7 +2087,7 @@
         safeSetItem(auditStorageKey(EDIT_LOCKED_KEY_PREFIX, presetKey), editLocked ? "true" : "false"),
         safeSetItem(auditStorageKey(FINAL_EXPORT_SIGNATURE_KEY_PREFIX, presetKey), finalExportSignature)
       ].every(Boolean);
-      if (ok && presetKey === "zippy_occupied") {
+      if (ok && presetKey === "zippy_warehouse_audit") {
         safeSetItem(STORAGE_KEY, JSON.stringify(entries));
         safeSetItem(DELETED_KEY, JSON.stringify(deletedEntries));
         safeSetItem(DUPE_KEY, String(duplicateBlocks));
@@ -2097,7 +2103,7 @@
     function saveOccupiedMaster() {
       const presetKey = selectedCloudPresetKey();
       const ok = safeSetItem(occupiedMasterStorageKey(presetKey), JSON.stringify(occupiedMaster));
-      if (ok && presetKey === "zippy_occupied") safeSetItem(MONTHLY_OCCUPIED_KEY, JSON.stringify(occupiedMaster));
+      if (ok && presetKey === "zippy_warehouse_audit") safeSetItem(MONTHLY_OCCUPIED_KEY, JSON.stringify(occupiedMaster));
       return ok;
     }
 
@@ -4049,11 +4055,11 @@
     }
 
     function selectedCloudPresetKey() {
-      return CLOUD_PRESETS[cloudPresetSelect.value] ? cloudPresetSelect.value : "zippy_occupied";
+      return CLOUD_PRESETS[cloudPresetSelect.value] ? cloudPresetSelect.value : "zippy_warehouse_audit";
     }
 
     function cloudSettingsForPreset(presetKey) {
-      const key = CLOUD_PRESETS[presetKey] ? presetKey : "zippy_occupied";
+      const key = CLOUD_PRESETS[presetKey] ? presetKey : "zippy_warehouse_audit";
       const preset = CLOUD_PRESETS[key];
       return {
         key,
@@ -4159,16 +4165,16 @@
     }
 
     function clearCloudSettings() {
-      cloudPresetSelect.value = "zippy_occupied";
+      cloudPresetSelect.value = "zippy_warehouse_audit";
       const ok = [
-        safeSetItem(CLOUD_PRESET_KEY, "zippy_occupied"),
+        safeSetItem(CLOUD_PRESET_KEY, "zippy_warehouse_audit"),
         safeRemoveItem(CLOUD_URL_KEY),
         safeRemoveItem(CLOUD_ANON_KEY),
         safeRemoveItem(CLOUD_SYNC_NAME_KEY)
       ].every(Boolean);
       setCloudStatus(
         ok
-          ? "Cloud preset reset to Zippy Shell Occupied Audit."
+          ? "Cloud preset reset to Zippy Shell Warehouse Audit."
           : "Cloud preset reset for this app session, but browser storage did not fully update.",
         ok ? "success" : "warning"
       );
